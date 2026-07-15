@@ -1,0 +1,165 @@
+@import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+
+:root {
+  /* Hand-drawn Space Theme Colors */
+  --bg-space: #050510;
+  
+  /* Vibrant Pop Colors */
+  --color-yellow: #FFC800;
+  --color-red: #FF4B3E;
+  --color-pink: #FF66A3;
+  --color-mint: #00C996;
+  --color-blue: #3EA1FF;
+  --color-white: #FFFFFF;
+  --color-black: #111111;
+
+  /* Wobbly Border Radius for hand-drawn look */
+  --wobbly-radius-1: 255px 15px 225px 15px/15px 225px 15px 255px;
+  --wobbly-radius-2: 15px 225px 15px 255px/255px 15px 225px 15px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Jua', sans-serif;
+  background-color: var(--bg-space);
+  color: var(--color-white);
+  min-height: 100vh;
+  overflow-x: hidden;
+  /* Basic starry background with noise overlay effect simulated by radial gradients */
+  background-image: 
+    radial-gradient(2px 2px at 20px 30px, #ffffff, rgba(0,0,0,0)),
+    radial-gradient(2.5px 2.5px at 150px 80px, #FFC800, rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 300px 160px, #ffffff, rgba(0,0,0,0)),
+    radial-gradient(3px 3px at 450px 40px, #FF66A3, rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 600px 220px, #ffffff, rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 80px 300px, #3EA1FF, rgba(0,0,0,0)),
+    radial-gradient(2.5px 2.5px at 250px 350px, #ffffff, rgba(0,0,0,0));
+  background-size: 800px 500px;
+  position: relative;
+}
+
+/* Global Noise Texture Overlay */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.15;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: 2px;
+  text-shadow: 2px 2px 0 var(--color-black);
+}
+
+.admin-mode h1,
+.admin-mode h2,
+.admin-mode h3,
+.admin-mode h4,
+.admin-mode h5,
+.admin-mode h6,
+.admin-mode span,
+.admin-mode p {
+  text-shadow: none !important;
+}
+
+/* Hand-drawn Buttons */
+.btn-wobbly {
+  font-family: 'Jua', sans-serif;
+  font-size: 1.5rem;
+  padding: 12px 30px;
+  background-color: var(--color-yellow);
+  color: var(--color-black);
+  border: 4px solid var(--color-black);
+  border-radius: var(--wobbly-radius-1);
+  cursor: pointer;
+  box-shadow: 4px 4px 0 var(--color-black);
+  transition: all 0.2s ease;
+  position: relative;
+  text-transform: uppercase;
+}
+
+.btn-wobbly:hover {
+  transform: translate(-2px, -2px) rotate(-2deg);
+  box-shadow: 6px 6px 0 var(--color-black);
+  background-color: var(--color-mint);
+}
+
+.btn-wobbly:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--color-black);
+}
+
+/* Hand-drawn Inputs */
+.input-wobbly {
+  font-family: 'Jua', sans-serif;
+  font-size: 1.2rem;
+  padding: 15px 20px;
+  background-color: var(--color-white);
+  color: var(--color-black);
+  border: 4px solid var(--color-black);
+  border-radius: var(--wobbly-radius-2);
+  box-shadow: inset 2px 2px 0 rgba(0,0,0,0.1), 3px 3px 0 var(--color-black);
+  outline: none;
+  width: 100%;
+  max-width: 300px;
+  transition: all 0.2s ease;
+}
+
+.input-wobbly:focus {
+  background-color: #FFFDE7;
+  transform: scale(1.02);
+}
+
+.input-wobbly::placeholder {
+  color: #888;
+}
+
+/* Hand-drawn Card/Container */
+.card-wobbly {
+  background-color: var(--color-blue);
+  border: 5px solid var(--color-black);
+  border-radius: var(--wobbly-radius-1);
+  padding: 40px;
+  box-shadow: 8px 8px 0 var(--color-black);
+  color: var(--color-black);
+}
+
+/* Hover effects for hand-drawn cards/elements */
+.wobbly-hover {
+  transition: all 0.2s ease;
+}
+
+.wobbly-hover:hover {
+  transform: translate(-3px, -3px) rotate(-1deg);
+  box-shadow: 8px 8px 0 var(--color-black) !important;
+}
+
+.wobbly-hover:active {
+  transform: translate(2px, 2px);
+  box-shadow: 3px 3px 0 var(--color-black) !important;
+}
+
+/* Animations */
+@keyframes float {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-15px) rotate(2deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+.floating {
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes pulse-star {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
