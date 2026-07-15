@@ -64,10 +64,30 @@ export default function MissionModal({ isOpen, missionState, players, myPlayerId
         {!bothAnswered ? (
           <div style={styles.phaseContainer}>
             {isThirdParty && (
-              <h3 style={styles.instruction}>
-                {activePlayer.name}님이 {targetPlayer.name}님의 행동을 예측 중입니다...<br/>
-                결과를 기다려주세요! ⏳
-              </h3>
+              <>
+                <h3 style={styles.instruction}>
+                  {activePlayer.name}님이 {targetPlayer.name}님의 행동을 예측 중입니다...<br/>
+                  결과를 기다려주세요! ⏳
+                </h3>
+                <div style={styles.optionsList}>
+                  {data.options.map((opt, i) => (
+                    <button 
+                      key={i} 
+                      className="btn-wobbly" 
+                      style={{
+                        ...styles.optionBtn,
+                        backgroundColor: 'var(--color-white)',
+                        border: '3px solid var(--color-black)',
+                        opacity: 0.8,
+                        cursor: 'default'
+                      }} 
+                      disabled
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
             {isPredictor && (
               <>
