@@ -177,18 +177,13 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
     });
   };
 
-  const handleArrival = async (activePlayer, rolledFace, snapData, currentPlayers) => {
+  const handleSpaceArrival = async (activePlayer, finalPos, snapData, currentPlayers, baseUpdates = {}) => {
     if (!snapData) return;
     
-    let currentPos = 0;
-    if (snapData.playerPositions && typeof snapData.playerPositions[activePlayer.id] === 'number' && !isNaN(snapData.playerPositions[activePlayer.id])) {
-      currentPos = snapData.playerPositions[activePlayer.id];
-    }
-    
-    const finalPos = (currentPos + rolledFace) % 24;
     const space = boardRef.current.find(s => s.id === finalPos);
 
     let nextStateUpdates = {
+      ...baseUpdates,
       [`playerPositions.${activePlayer.id}`]: finalPos,
     };
 
@@ -210,12 +205,10 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
           let availableIndices = catMissions.map((_, i) => i).filter(i => !globalUsed.includes(i) && !targetUsed.includes(i));
         
           if (availableIndices.length === 0) {
-            // Global category depletion reached, reset global pool for this category
             globalUsed = [];
             availableIndices = catMissions.map((_, i) => i).filter(i => !targetUsed.includes(i));
             
             if (availableIndices.length === 0) {
-              // The target has literally answered all questions in this category, reset target pool
               targetUsed = [];
               availableIndices = catMissions.map((_, i) => i);
             }
@@ -273,29 +266,36 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
     await updateDoc(gameStateRef, nextStateUpdates);
   };
 
+  const handleArrival = (activePlayer, rolledFace, snapData, currentPlayers) => {
+    let currentPos = 0;
+    if (snapData.playerPositions && typeof snapData.playerPositions[activePlayer.id] === 'number') {
+      currentPos = snapData.playerPositions[activePlayer.id];
+    }
+    const finalPos = (currentPos + rolledFace) % 24;
+    handleSpaceArrival(activePlayer, finalPos, snapData, currentPlayers, {});
+  };
+
   const handleGoldenKeyApply = async (card) => {
     if (!gameState || gameState.goldenKeyState?.activePlayerId !== playerId) return;
     
-    let nextUpdates = {
+    const cpPos = gameState.playerPositions[playerId] || 0;
+    const activePlayer = players.find(p => p.id === playerId);
+    
+    let baseUpdates = {
       'goldenKeyState.isOpen': false,
-      turnIndex: ((gameState.turnIndex || 0) + 1) % players.length,
-      'diceState.isRolling': false
     };
 
-    const cpPos = gameState.playerPositions[playerId] || 0;
-    
     if (card.action === 'move') {
       let nextPos = (cpPos + card.value) % 24;
       if (nextPos < 0) nextPos += 24;
-      nextUpdates[`playerPositions.${playerId}`] = nextPos;
+      handleSpaceArrival(activePlayer, nextPos, gameState, players, baseUpdates);
+      return;
     } else if (card.action === 'move_to') {
-      nextUpdates[`playerPositions.${playerId}`] = card.value;
-    } else if (card.action === 'skip_turn') {
-      // Just advance turn for now
-    } else if (card.action === 'roll_again') {
-      nextUpdates.turnIndex = gameState.turnIndex; 
+      handleSpaceArrival(activePlayer, card.value, gameState, players, baseUpdates);
+      return;
     } else if (card.action === 'move_random') {
-      nextUpdates[`playerPositions.${playerId}`] = Math.floor(Math.random() * 24);
+      handleSpaceArrival(activePlayer, Math.floor(Math.random() * 24), gameState, players, baseUpdates);
+      return;
     } else if (card.action === 'steal_flag') {
       const othersLands = [];
       Object.keys(landOwnership).forEach(sid => {
@@ -308,9 +308,17 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
         await updateDoc(gameStateRef, { 'goldenKeyState.isOpen': false });
         return; 
       }
+    } else if (card.action === 'roll_again') {
+      baseUpdates['turnIndex'] = gameState.turnIndex; 
+      baseUpdates['diceState.isRolling'] = false;
+      await updateDoc(gameStateRef, baseUpdates);
+      return;
     }
-
-    await updateDoc(gameStateRef, nextUpdates);
+    
+    // For 'skip_turn', 'none', or 'steal_flag' with no lands to steal:
+    baseUpdates['turnIndex'] = ((gameState.turnIndex || 0) + 1) % players.length;
+    baseUpdates['diceState.isRolling'] = false;
+    await updateDoc(gameStateRef, baseUpdates);
   };
 
   const handleStealFlag = async (land) => {
