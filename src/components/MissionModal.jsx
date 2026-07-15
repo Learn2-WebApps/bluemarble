@@ -41,6 +41,7 @@ export default function MissionModal({ isOpen, missionState, players, myPlayerId
   const displayQuestion = () => {
     let q = data.question;
     const tName = targetPlayer.name.endsWith('님') ? targetPlayer.name : `${targetPlayer.name}님`;
+    q = q.replace(/OO님/g, tName);
     q = q.replace(/\s*나는\?$/, '');
     q = q.replace(/\s*나의 대처는\?$/, '');
     q = q.replace(/(^|\s)내가($|\s)/g, `$1${tName}이(가)$2`);
