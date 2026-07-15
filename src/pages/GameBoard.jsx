@@ -176,74 +176,75 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
   const playLocalKeyAnimation = (animData, snapData) => {
     const { action, value, playerId: animPlayerId } = animData;
     
-    setPlayers(latestPlayers => {
-      const pIndex = latestPlayers.findIndex(p => p.id === animPlayerId);
-      if (pIndex === -1) {
-        isRollingRef.current = false;
-        return latestPlayers;
-      }
+    let currentPos = snapData.playerPositions[animPlayerId] || 0;
+    let targetPos;
 
-      let currentPos = snapData.playerPositions[animPlayerId] || 0;
-      let targetPos;
+    if (action === 'move') {
+      targetPos = (currentPos + value) % 24;
+      if (targetPos < 0) targetPos += 24;
+    } else if (action === 'move_to') {
+      targetPos = value;
+    } else if (action === 'move_random') {
+      targetPos = value; // we pass the pre-computed random target pos in `value`
+    }
 
-      if (action === 'move') {
-        targetPos = (currentPos + value) % 24;
-        if (targetPos < 0) targetPos += 24;
-      } else if (action === 'move_to') {
-        targetPos = value;
-      } else if (action === 'move_random') {
-        targetPos = value; // we pass the pre-computed random target pos in `value`
-      }
+    let steps = 0;
+    let stepDirection = 1;
+    
+    if (action === 'move') {
+       steps = Math.abs(value);
+       stepDirection = value < 0 ? -1 : 1;
+    } else {
+       steps = (targetPos - currentPos + 24) % 24;
+       stepDirection = 1;
+    }
 
-      let steps = 0;
-      let stepDirection = 1;
-      
-      if (action === 'move') {
-         steps = Math.abs(value);
-         stepDirection = value < 0 ? -1 : 1;
-      } else {
-         steps = (targetPos - currentPos + 24) % 24;
-         stepDirection = 1;
-      }
-
-      if (steps === 0) {
-        isRollingRef.current = false;
-        if (playerId === animPlayerId) {
-          handleSpaceArrival(latestPlayers[pIndex], currentPos, snapData, latestPlayers, {});
-        }
-        return latestPlayers;
-      }
-
-      let stepsTaken = 0;
-      const moveInterval = setInterval(() => {
-        stepsTaken++;
-        setPlayers(prev => {
-          const newPlayers = [...prev];
-          const cp = { ...newPlayers[pIndex] };
-          if (cp) {
-            cp.position = (cp.position + stepDirection + 24) % 24;
-            newPlayers[pIndex] = cp;
+    if (steps === 0) {
+      isRollingRef.current = false;
+      if (playerId === animPlayerId) {
+        setPlayers(latestPlayers => {
+          const pIndex = latestPlayers.findIndex(p => p.id === animPlayerId);
+          if (pIndex !== -1) {
+            handleSpaceArrival(latestPlayers[pIndex], currentPos, snapData, latestPlayers, {});
           }
-          return newPlayers;
+          return latestPlayers;
         });
+      }
+      return;
+    }
 
-        if (stepsTaken >= steps) {
-          clearInterval(moveInterval);
-          isRollingRef.current = false; // Release lock
-          
-          if (playerId === animPlayerId) {
-            setTimeout(() => {
-              setPlayers(finalPlayers => {
-                handleSpaceArrival(finalPlayers[pIndex], targetPos, snapData, finalPlayers, {});
-                return finalPlayers;
-              });
-            }, 400);
-          }
-        }
-      }, 400);
+    let stepsTaken = 0;
+    const moveInterval = setInterval(() => {
+      stepsTaken++;
       
-      return latestPlayers;
-    });
+      setPlayers(prev => {
+        const newPlayers = [...prev];
+        const pIndex = newPlayers.findIndex(p => p.id === animPlayerId);
+        if (pIndex !== -1) {
+          const cp = { ...newPlayers[pIndex] };
+          cp.position = (cp.position + stepDirection + 24) % 24;
+          newPlayers[pIndex] = cp;
+        }
+        return newPlayers;
+      });
+
+      if (stepsTaken >= steps) {
+        clearInterval(moveInterval);
+        isRollingRef.current = false; // Release lock
+        
+        if (playerId === animPlayerId) {
+          setTimeout(() => {
+            setPlayers(latestPlayers => {
+              const pIndex = latestPlayers.findIndex(p => p.id === animPlayerId);
+              if (pIndex !== -1) {
+                handleSpaceArrival(latestPlayers[pIndex], targetPos, snapData, latestPlayers, {});
+              }
+              return latestPlayers;
+            });
+          }, 400);
+        }
+      }
+    }, 400);
   };
 
   const handleRollClick = async () => {
