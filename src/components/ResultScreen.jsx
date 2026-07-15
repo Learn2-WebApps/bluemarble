@@ -50,15 +50,17 @@ export default function ResultScreen({ players, landOwnership, onHome }) {
                   <div style={{ ...styles.rankBadge, backgroundColor: p.character?.color || 'var(--color-white)' }}>
                     {isFirst ? '👑 1위' : `${index + 1}위`}
                   </div>
-                  <Planet 
-                    color={p.character?.color || 'var(--color-white)'} 
-                    width={isFirst ? 80 : 50} 
-                    height={isFirst ? 80 : 50} 
-                    isLocked={false} 
-                    ringColor="var(--color-black)"
-                  />
-                  <div style={styles.playerName}>
-                    {p.name}
+                  <div style={styles.playerInfoColumn}>
+                    <Planet 
+                      color={p.character?.color || 'var(--color-white)'} 
+                      width={isFirst ? 60 : 40} 
+                      height={isFirst ? 60 : 40} 
+                      isLocked={false} 
+                      ringColor="var(--color-black)"
+                    />
+                    <div style={styles.playerName}>
+                      {p.name}
+                    </div>
                   </div>
                 </div>
                 <div style={styles.score}>
@@ -137,6 +139,12 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '15px',
+  },
+  playerInfoColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '5px',
   },
   rankBadge: {
     padding: '5px 15px',
