@@ -556,7 +556,7 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
 const styles = {
   container: {
     width: '100vw',
-    height: '100vh',
+    height: '100dvh',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
@@ -565,13 +565,17 @@ const styles = {
     backgroundColor: 'transparent',
   },
   boardWrapper: {
-    width: '100vw',
-    height: '100vh',
+    width: '100%',
+    height: '100%',
+    maxWidth: '100vw',
+    maxHeight: '100dvh',
     position: 'relative',
     zIndex: 1,
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: '2px',
+    boxSizing: 'border-box',
   },
   gridContainer: {
     width: '100%',

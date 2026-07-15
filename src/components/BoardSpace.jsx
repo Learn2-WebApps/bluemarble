@@ -81,10 +81,11 @@ const styles = {
     overflow: 'hidden',
   },
   nameContainer: {
-    fontSize: 'clamp(1.2rem, 3vmin, 3rem)',
+    fontSize: 'clamp(0.9rem, 2.5vmin, 3rem)',
     fontWeight: 'bold',
     textAlign: 'center',
-    wordBreak: 'keep-all',
+    wordBreak: 'break-word',
+    whiteSpace: 'pre-wrap',
     lineHeight: '1.2',
     position: 'absolute',
     top: '50%',
