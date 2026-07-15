@@ -5,17 +5,23 @@ import SpaceBackground from '../components/SpaceBackground';
 import BoardSpace from '../components/BoardSpace';
 import Dice from '../components/Dice';
 import MissionModal from '../components/MissionModal';
+import GoldenKeyModal from '../components/GoldenKeyModal';
+import StealSelectionModal from '../components/StealSelectionModal';
 import ResultScreen from '../components/ResultScreen';
 import { generateBoard } from '../utils/boardData';
 import { missions } from '../data/missions';
+import { goldenKeys } from '../data/goldenKeys';
 
 export default function GameBoard({ sessionData, onBack, onHome }) {
   const { code, roomId, playerId, nickname } = sessionData;
   const [board, setBoard] = useState([]);
   const [players, setPlayers] = useState([]);
   const [gameState, setGameState] = useState(null);
+  const [sessionInfo, setSessionInfo] = useState(null);
   const [isGameOver, setIsGameOver] = useState(false);
   const [landOwnership, setLandOwnership] = useState({});
+  const [timeLeft, setTimeLeft] = useState(600);
+  const [stealState, setStealState] = useState({ isOpen: false, othersLands: [] });
   const boardRef = useRef([]);
   const lastDiceTrigger = useRef(null);
   const isRollingRef = useRef(false);
@@ -27,6 +33,35 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
     setBoard(newBoard);
     boardRef.current = newBoard;
   }, []);
+
+  // Subscribe to Session Info for Timer
+  useEffect(() => {
+    if (!code) return;
+    const unsub = onSnapshot(doc(db, 'sessions', code), (docSnap) => {
+      if (docSnap.exists()) setSessionInfo(docSnap.data());
+    });
+    return () => unsub();
+  }, [code]);
+
+  // Timer logic
+  useEffect(() => {
+    if (!sessionInfo?.startedAt || isGameOver) return;
+    const timer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - sessionInfo.startedAt) / 1000);
+      const remaining = Math.max(0, 600 - elapsed);
+      setTimeLeft(remaining);
+      if (remaining <= 0) {
+        setIsGameOver(true);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [sessionInfo?.startedAt, isGameOver]);
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   // Initialize Game State and Fetch Players
   useEffect(() => {
@@ -54,6 +89,7 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
           turnIndex: 0,
           diceState: { isRolling: false, face: 1, triggeredAt: null },
           missionState: { isOpen: false, activePlayerId: null, targetPlayerId: null, data: null, spaceId: null, prediction: null, actualAnswer: null, isResolved: false },
+          goldenKeyState: { isOpen: false, card: null, activePlayerId: null },
           landOwnership: {},
           globalUsedMissions: {},
           targetUsedMissions: {},
@@ -180,10 +216,18 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
           return; // Wait for mission resolution
         }
       }
-    } else if (space && (space.type === 'goldenKey' || space.type === 'start')) {
-      // Show alert so the user doesn't think the mission bug is happening
+    } else if (space && space.type === 'goldenKey') {
+      const randomCard = goldenKeys[Math.floor(Math.random() * goldenKeys.length)];
+      nextStateUpdates['goldenKeyState'] = {
+        isOpen: true,
+        card: randomCard,
+        activePlayerId: activePlayer.id
+      };
+      await updateDoc(gameStateRef, nextStateUpdates);
+      return;
+    } else if (space && space.type === 'start') {
       if (activePlayer.id === playerId) {
-         window.alert(`${space.name} 칸에 도착했습니다!\n(기능 준비 중이므로 다음 턴으로 바로 넘어갑니다)`);
+         window.alert(`START 칸에 도착했습니다!\n(다음 턴으로 바로 넘어갑니다)`);
       }
     }
     
@@ -191,6 +235,72 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
     nextStateUpdates['turnIndex'] = ((snapData.turnIndex || 0) + 1) % currentPlayers.length;
     nextStateUpdates['diceState.isRolling'] = false;
     await updateDoc(gameStateRef, nextStateUpdates);
+  };
+
+  const handleGoldenKeyApply = async (card) => {
+    if (!gameState || gameState.goldenKeyState?.activePlayerId !== playerId) return;
+    
+    let nextUpdates = {
+      'goldenKeyState.isOpen': false,
+      turnIndex: ((gameState.turnIndex || 0) + 1) % players.length,
+      'diceState.isRolling': false
+    };
+
+    const cpPos = gameState.playerPositions[playerId] || 0;
+    
+    if (card.action === 'move') {
+      let nextPos = (cpPos + card.value) % 24;
+      if (nextPos < 0) nextPos += 24;
+      nextUpdates[`playerPositions.${playerId}`] = nextPos;
+    } else if (card.action === 'move_to') {
+      nextUpdates[`playerPositions.${playerId}`] = card.value;
+    } else if (card.action === 'skip_turn') {
+      // Just advance turn for now
+    } else if (card.action === 'roll_again') {
+      nextUpdates.turnIndex = gameState.turnIndex; 
+    } else if (card.action === 'move_random') {
+      nextUpdates[`playerPositions.${playerId}`] = Math.floor(Math.random() * 24);
+    } else if (card.action === 'steal_flag') {
+      const othersLands = [];
+      Object.keys(landOwnership).forEach(sid => {
+        Object.keys(landOwnership[sid]).forEach(oid => {
+          if (oid !== playerId) othersLands.push({ spaceId: parseInt(sid), ownerId: oid });
+        });
+      });
+      if (othersLands.length > 0) {
+        setStealState({ isOpen: true, othersLands });
+        await updateDoc(gameStateRef, { 'goldenKeyState.isOpen': false });
+        return; 
+      }
+    }
+
+    await updateDoc(gameStateRef, nextUpdates);
+  };
+
+  const handleStealFlag = async (land) => {
+    if (!land) {
+      await updateDoc(gameStateRef, {
+        turnIndex: ((gameState.turnIndex || 0) + 1) % players.length,
+        'diceState.isRolling': false
+      });
+      setStealState({ isOpen: false });
+      return;
+    }
+    const { spaceId, ownerId } = land;
+    const newOwnership = { ...landOwnership };
+    if (newOwnership[spaceId] && newOwnership[spaceId][ownerId]) {
+      newOwnership[spaceId][ownerId] -= 1;
+      if (newOwnership[spaceId][ownerId] <= 0) delete newOwnership[spaceId][ownerId];
+    }
+    if (!newOwnership[spaceId]) newOwnership[spaceId] = {};
+    newOwnership[spaceId][playerId] = (newOwnership[spaceId][playerId] || 0) + 1;
+
+    await updateDoc(gameStateRef, {
+      landOwnership: newOwnership,
+      turnIndex: ((gameState.turnIndex || 0) + 1) % players.length,
+      'diceState.isRolling': false
+    });
+    setStealState({ isOpen: false });
   };
 
   const handleMissionSuccess = async () => {
@@ -250,6 +360,9 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
           })}
 
           <div style={styles.centerArea}>
+            <div style={styles.timerDisplay}>
+              ⏳ 남은 시간: {formatTime(timeLeft)}
+            </div>
             <div style={styles.turnIndicator}>
               지금은 <span style={{ color: currentPlayer?.character?.color }}>{currentPlayer?.name}</span>님 차례!
             </div>
@@ -278,6 +391,21 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
         gameStateRef={gameStateRef}
         onClose={handleMissionFailOrClose}
         onSuccess={handleMissionSuccess}
+      />
+      
+      <GoldenKeyModal
+        isOpen={gameState.goldenKeyState?.isOpen}
+        cardData={gameState.goldenKeyState?.card}
+        activePlayer={players.find(p => p.id === gameState.goldenKeyState?.activePlayerId)}
+        onApply={handleGoldenKeyApply}
+      />
+
+      <StealSelectionModal
+        isOpen={stealState.isOpen}
+        othersLands={stealState.othersLands}
+        players={players}
+        board={board}
+        onSelect={handleStealFlag}
       />
       
       {isGameOver && (
@@ -330,6 +458,13 @@ const styles = {
     border: '4px dashed var(--color-mint)',
     gap: '20px',
     margin: '10px',
+  },
+  timerDisplay: {
+    fontSize: '2rem',
+    fontWeight: 'bold',
+    color: 'var(--color-white)',
+    textShadow: '2px 2px 0 var(--color-black)',
+    marginBottom: '10px'
   },
   turnIndicator: {
     fontSize: '2.5rem',
