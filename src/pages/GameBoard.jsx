@@ -337,9 +337,7 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
       await updateDoc(gameStateRef, nextStateUpdates);
       return;
     } else if (space && space.type === 'start') {
-      if (activePlayer.id === playerId) {
-         window.alert(`START 칸에 도착했습니다!\n(다음 턴으로 바로 넘어갑니다)`);
-      }
+      // START 칸 도착 시 알림 없이 바로 턴만 넘어감
     }
     
     // If not a mission space, just advance turn

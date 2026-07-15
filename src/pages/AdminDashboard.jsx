@@ -31,6 +31,25 @@ export default function AdminDashboard({ onBack }) {
     return () => unsubscribe();
   }, []);
 
+  // 10분이 지나면 세션을 자동으로 종료 상태로 변경
+  useEffect(() => {
+    sessions.forEach(async (session) => {
+      if (session.status === 'playing' && session.startedAt) {
+        const elapsed = Math.floor((currentTime - session.startedAt) / 1000);
+        if (elapsed >= 600) {
+          try {
+            await updateDoc(doc(db, 'sessions', session.code), {
+              status: 'ended',
+              isStarted: false
+            });
+          } catch (error) {
+            console.error("Error auto-ending session:", error);
+          }
+        }
+      }
+    });
+  }, [currentTime, sessions]);
+
   const generateSessionCode = () => {
     return Math.floor(1000 + Math.random() * 9000).toString();
   };
