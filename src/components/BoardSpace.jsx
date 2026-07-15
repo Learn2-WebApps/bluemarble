@@ -1,6 +1,14 @@
 import React from 'react';
 import Planet from './Planet';
 
+const formatSpaceName = (name) => {
+  if (name === '자기계발') return '자기\n계발';
+  if (name === '갈등상황') return '갈등\n상황';
+  if (name === '황금열쇠') return '황금\n열쇠';
+  if (name === '돈/소비') return '돈/\n소비';
+  return name;
+};
+
 export default function BoardSpace({ space, players = [], owners = [] }) {
   const isStart = space.id === 0;
   const isGoldenKey = space.type === 'goldenKey';
@@ -44,7 +52,7 @@ export default function BoardSpace({ space, players = [], owners = [] }) {
             ))}
           </div>
         )}
-        <div>{space.name}</div>
+        <div>{formatSpaceName(space.name)}</div>
       </div>
       
       {/* 토큰(플레이어) 렌더링 영역 - 반응형 행성 아이콘 */}
@@ -84,7 +92,7 @@ const styles = {
     fontSize: 'clamp(0.9rem, 2.5vmin, 3rem)',
     fontWeight: 'bold',
     textAlign: 'center',
-    wordBreak: 'break-word',
+    wordBreak: 'keep-all',
     whiteSpace: 'pre-wrap',
     lineHeight: '1.2',
     position: 'absolute',
