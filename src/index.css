@@ -163,3 +163,26 @@ h1, h2, h3, h4, h5, h6 {
   0%, 100% { opacity: 0.8; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.2); }
 }
+
+/* Responsive adjustments for mobile screens */
+@media (max-width: 480px) {
+  .center-timer {
+    font-size: 1.2rem !important;
+    margin-bottom: 5px !important;
+  }
+  .center-turn-indicator {
+    font-size: 1.2rem !important;
+    padding: 10px 15px !important;
+    margin-bottom: 10px !important;
+  }
+  .center-dice-message {
+    font-size: 1rem !important;
+    margin-top: 5px !important;
+  }
+  .center-wait-message {
+    font-size: 1rem !important;
+    margin-top: 10px !important;
+    white-space: normal !important;
+    padding: 0 5px;
+  }
+}

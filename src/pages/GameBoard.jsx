@@ -494,10 +494,10 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
           })}
 
           <div style={styles.centerArea}>
-            <div style={styles.timerDisplay}>
+            <div className="center-timer" style={styles.timerDisplay}>
               ⏳ 남은 시간: {formatTime(timeLeft)}
             </div>
-            <div style={styles.turnIndicator}>
+            <div className="center-turn-indicator" style={{...styles.turnIndicator, whiteSpace: 'nowrap', textAlign: 'center'}}>
               지금은 <span style={{ color: currentPlayer?.character?.color }}>{currentPlayer?.name}</span>님 차례!
             </div>
             <div onClick={handleRollClick} style={{ pointerEvents: isMyTurn ? 'auto' : 'none', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -507,11 +507,11 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
                 disabled={!isMyTurn} 
               />
               {isMyTurn ? (
-                <span style={{ marginTop: '10px', fontSize: '1.2rem', color: 'var(--color-yellow)', fontWeight: 'bold', animation: 'pulse 1.5s infinite' }}>주사위를 클릭하세요!</span>
+                <span className="center-dice-message" style={{ marginTop: '10px', fontSize: '1.2rem', color: 'var(--color-yellow)', fontWeight: 'bold', animation: 'pulse 1.5s infinite', whiteSpace: 'nowrap' }}>주사위를 클릭하세요!</span>
               ) : null}
             </div>
             {!isMyTurn && (
-              <p style={{ color: 'white', fontWeight: 'bold', marginTop: '20px', fontSize: '1.2rem' }}>{currentPlayer?.name}님이 주사위를 던지기를 기다리는 중...</p>
+              <p className="center-wait-message" style={{ color: 'white', fontWeight: 'bold', marginTop: '20px', fontSize: '1.2rem', textAlign: 'center', whiteSpace: 'nowrap' }}>{currentPlayer?.name}님이 주사위를 던지기를 기다리는 중...</p>
             )}
           </div>
         </div>
