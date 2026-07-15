@@ -198,8 +198,44 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
         const otherPlayers = currentPlayers.filter(p => p.id !== activePlayer.id);
         if (otherPlayers.length > 0) {
           const chosenTarget = otherPlayers[Math.floor(Math.random() * otherPlayers.length)];
-          const chosenMissionIndex = Math.floor(Math.random() * catMissions.length);
+          
+          const category = space.name;
+          const targetUsedObj = snapData.targetUsedMissions || {};
+          const globalUsedObj = snapData.globalUsedMissions || {};
+        
+          const targetUsedAllCats = targetUsedObj[chosenTarget.id] || {};
+          let targetUsed = targetUsedAllCats[category] || [];
+          let globalUsed = globalUsedObj[category] || [];
+        
+          let availableIndices = catMissions.map((_, i) => i).filter(i => !globalUsed.includes(i) && !targetUsed.includes(i));
+        
+          if (availableIndices.length === 0) {
+            // Global category depletion reached, reset global pool for this category
+            globalUsed = [];
+            availableIndices = catMissions.map((_, i) => i).filter(i => !targetUsed.includes(i));
+            
+            if (availableIndices.length === 0) {
+              // The target has literally answered all questions in this category, reset target pool
+              targetUsed = [];
+              availableIndices = catMissions.map((_, i) => i);
+            }
+          }
+        
+          const chosenMissionIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
           const randomMission = catMissions[chosenMissionIndex];
+        
+          nextStateUpdates['targetUsedMissions'] = {
+            ...targetUsedObj,
+            [chosenTarget.id]: {
+              ...targetUsedAllCats,
+              [category]: [...targetUsed, chosenMissionIndex]
+            }
+          };
+        
+          nextStateUpdates['globalUsedMissions'] = {
+            ...globalUsedObj,
+            [category]: [...globalUsed, chosenMissionIndex]
+          };
 
           nextStateUpdates['missionState'] = {
             isOpen: true,
