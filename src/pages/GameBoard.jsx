@@ -24,6 +24,7 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
   const [stealState, setStealState] = useState({ isOpen: false, othersLands: [] });
   const boardRef = useRef([]);
   const lastDiceTrigger = useRef(null);
+  const lastKeyTrigger = useRef(null);
   const isRollingRef = useRef(false);
 
   const gameStateRef = doc(db, 'sessions', code, 'rooms', roomId, 'gameState', 'state');
@@ -90,6 +91,7 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
           diceState: { isRolling: false, face: 1, triggeredAt: null },
           missionState: { isOpen: false, activePlayerId: null, targetPlayerId: null, data: null, spaceId: null, prediction: null, actualAnswer: null, isResolved: false },
           goldenKeyState: { isOpen: false, card: null, activePlayerId: null },
+          goldenKeyMoveAnim: null,
           landOwnership: {},
           globalUsedMissions: {},
           targetUsedMissions: {},
@@ -123,6 +125,13 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
           lastDiceTrigger.current = data.diceState.triggeredAt;
           isRollingRef.current = true; // Lock position sync from DB
           playLocalDiceAnimation(data.diceState.face, data.turnIndex, data);
+        }
+
+        // Trigger local golden key animation if new movement detected
+        if (data.goldenKeyMoveAnim && data.goldenKeyMoveAnim.triggeredAt !== lastKeyTrigger.current) {
+          lastKeyTrigger.current = data.goldenKeyMoveAnim.triggeredAt;
+          isRollingRef.current = true; // Lock position sync from DB
+          playLocalKeyAnimation(data.goldenKeyMoveAnim, data);
         }
       }
     });
@@ -162,6 +171,79 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
         }
       }, 500);
     }, 1800); // Wait for dice rolling animation (1.5s + buffer)
+  };
+
+  const playLocalKeyAnimation = (animData, snapData) => {
+    const { action, value, playerId: animPlayerId } = animData;
+    
+    setPlayers(latestPlayers => {
+      const pIndex = latestPlayers.findIndex(p => p.id === animPlayerId);
+      if (pIndex === -1) {
+        isRollingRef.current = false;
+        return latestPlayers;
+      }
+
+      let currentPos = snapData.playerPositions[animPlayerId] || 0;
+      let targetPos;
+
+      if (action === 'move') {
+        targetPos = (currentPos + value) % 24;
+        if (targetPos < 0) targetPos += 24;
+      } else if (action === 'move_to') {
+        targetPos = value;
+      } else if (action === 'move_random') {
+        targetPos = value; // we pass the pre-computed random target pos in `value`
+      }
+
+      let steps = 0;
+      let stepDirection = 1;
+      
+      if (action === 'move') {
+         steps = Math.abs(value);
+         stepDirection = value < 0 ? -1 : 1;
+      } else {
+         steps = (targetPos - currentPos + 24) % 24;
+         stepDirection = 1;
+      }
+
+      if (steps === 0) {
+        isRollingRef.current = false;
+        if (playerId === animPlayerId) {
+          handleSpaceArrival(latestPlayers[pIndex], currentPos, snapData, latestPlayers, {});
+        }
+        return latestPlayers;
+      }
+
+      let stepsTaken = 0;
+      const moveInterval = setInterval(() => {
+        stepsTaken++;
+        setPlayers(prev => {
+          const newPlayers = [...prev];
+          const cp = { ...newPlayers[pIndex] };
+          if (cp) {
+            cp.position = (cp.position + stepDirection + 24) % 24;
+            newPlayers[pIndex] = cp;
+          }
+          return newPlayers;
+        });
+
+        if (stepsTaken >= steps) {
+          clearInterval(moveInterval);
+          isRollingRef.current = false; // Release lock
+          
+          if (playerId === animPlayerId) {
+            setTimeout(() => {
+              setPlayers(finalPlayers => {
+                handleSpaceArrival(finalPlayers[pIndex], targetPos, snapData, finalPlayers, {});
+                return finalPlayers;
+              });
+            }, 400);
+          }
+        }
+      }, 400);
+      
+      return latestPlayers;
+    });
   };
 
   const handleRollClick = async () => {
@@ -278,23 +360,25 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
   const handleGoldenKeyApply = async (card) => {
     if (!gameState || gameState.goldenKeyState?.activePlayerId !== playerId) return;
     
-    const cpPos = gameState.playerPositions[playerId] || 0;
-    const activePlayer = players.find(p => p.id === playerId);
-    
     let baseUpdates = {
       'goldenKeyState.isOpen': false,
     };
 
-    if (card.action === 'move') {
-      let nextPos = (cpPos + card.value) % 24;
-      if (nextPos < 0) nextPos += 24;
-      handleSpaceArrival(activePlayer, nextPos, gameState, players, baseUpdates);
-      return;
-    } else if (card.action === 'move_to') {
-      handleSpaceArrival(activePlayer, card.value, gameState, players, baseUpdates);
-      return;
-    } else if (card.action === 'move_random') {
-      handleSpaceArrival(activePlayer, Math.floor(Math.random() * 24), gameState, players, baseUpdates);
+    if (card.action === 'move' || card.action === 'move_to' || card.action === 'move_random') {
+      let animValue = card.value;
+      if (card.action === 'move_random') {
+        animValue = Math.floor(Math.random() * 24);
+      }
+      
+      await updateDoc(gameStateRef, {
+        ...baseUpdates,
+        goldenKeyMoveAnim: {
+          triggeredAt: Date.now(),
+          action: card.action,
+          value: animValue,
+          playerId: playerId
+        }
+      });
       return;
     } else if (card.action === 'steal_flag') {
       const othersLands = [];
@@ -305,7 +389,7 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
       });
       if (othersLands.length > 0) {
         setStealState({ isOpen: true, othersLands });
-        await updateDoc(gameStateRef, { 'goldenKeyState.isOpen': false });
+        await updateDoc(gameStateRef, baseUpdates);
         return; 
       }
     } else if (card.action === 'roll_again') {
