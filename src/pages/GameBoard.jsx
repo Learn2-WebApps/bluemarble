@@ -44,9 +44,16 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
     return () => unsub();
   }, [code]);
 
-  // Timer logic
+  // Timer logic & Admin End Game Check
   useEffect(() => {
+    if (sessionInfo?.status === 'ended' && !isGameOver) {
+      setIsGameOver(true);
+      setTimeLeft(0);
+      return;
+    }
+
     if (!sessionInfo?.startedAt || isGameOver) return;
+    
     const timer = setInterval(() => {
       const elapsed = Math.floor((Date.now() - sessionInfo.startedAt) / 1000);
       const remaining = Math.max(0, 600 - elapsed);
@@ -56,7 +63,7 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, [sessionInfo?.startedAt, isGameOver]);
+  }, [sessionInfo?.startedAt, sessionInfo?.status, isGameOver]);
 
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
