@@ -198,4 +198,15 @@ h1, h2, h3, h4, h5, h6 {
     flex: none !important;
     min-height: 400px !important;
   }
+  
+  .result-player-info {
+    flex-direction: column !important;
+    gap: 5px !important;
+  }
+}
+
+.result-player-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
 }
