@@ -185,4 +185,17 @@ h1, h2, h3, h4, h5, h6 {
     white-space: normal !important;
     padding: 0 5px;
   }
+  
+  .admin-content {
+    flex-direction: column !important;
+    overflow-y: auto !important;
+  }
+  .admin-left-panel {
+    flex: none !important;
+    height: 300px !important;
+  }
+  .admin-right-panel {
+    flex: none !important;
+    min-height: 400px !important;
+  }
 }

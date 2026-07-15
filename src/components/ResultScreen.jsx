@@ -55,13 +55,14 @@ export default function ResultScreen({ players, landOwnership, onHome }) {
                     width={isFirst ? 80 : 50} 
                     height={isFirst ? 80 : 50} 
                     isLocked={false} 
+                    ringColor="var(--color-black)"
                   />
                   <div style={styles.playerName}>
                     {p.name}
                   </div>
                 </div>
                 <div style={styles.score}>
-                  🚩 <strong>{p.flags}</strong>개
+                  <strong>{p.flags}개</strong>
                 </div>
               </div>
             );
@@ -142,24 +143,31 @@ const styles = {
     borderRadius: '20px',
     border: '3px solid var(--color-black)',
     fontWeight: '900',
-    fontSize: '1.2rem',
+    fontSize: 'clamp(1rem, 4vw, 1.2rem)',
     color: 'var(--color-black)',
     textShadow: '1px 1px 0 rgba(255,255,255,0.5)',
+    whiteSpace: 'nowrap',
   },
   playerName: {
-    fontSize: '1.5rem',
+    fontSize: 'clamp(1.1rem, 4vw, 1.5rem)',
     fontWeight: 'bold',
     color: 'var(--color-black)',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '120px',
   },
   score: {
-    fontSize: '1.8rem',
+    fontSize: 'clamp(1.2rem, 5vw, 1.8rem)',
     color: 'var(--color-black)',
+    whiteSpace: 'nowrap',
+    marginLeft: 'auto',
   },
   homeBtn: {
     width: '100%',
     padding: '15px',
     fontSize: '1.5rem',
-    backgroundColor: 'var(--color-mint)',
+    backgroundColor: '#E0E0E0',
     color: 'var(--color-black)',
   }
 };

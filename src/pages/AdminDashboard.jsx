@@ -217,9 +217,9 @@ export default function AdminDashboard({ onBack }) {
           <div style={{ width: '100px' }}></div>
         </div>
 
-        <div style={styles.content}>
+        <div className="admin-content" style={styles.content}>
           {/* 좌측 패널: 세션 목록 */}
-          <div className="card-wobbly" style={styles.leftPanel}>
+          <div className="card-wobbly admin-left-panel" style={styles.leftPanel}>
             <button className="btn-wobbly" style={styles.createBtn} onClick={handleCreateSession}>
               + 새 세션 생성
             </button>
@@ -255,7 +255,7 @@ export default function AdminDashboard({ onBack }) {
           </div>
 
           {/* 우측 패널: 세션 상세 설정 */}
-          <div className="card-wobbly" style={styles.rightPanel}>
+          <div className="card-wobbly admin-right-panel" style={styles.rightPanel}>
             {selectedSession ? (
               <div style={styles.sessionDetail}>
                 <h2 style={styles.detailTitle}>
