@@ -112,6 +112,38 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
     }
   }, [code, roomId]);
 
+  // 플레이어 명단 실시간 동기화.
+  // 기존에는 게임 시작 시 1회만 읽어서 클라이언트마다 후보 명단이 어긋날 수 있었다.
+  // 말 위치 등 진행 중 상태는 기존 값을 그대로 유지하고 명단(입장/이탈)만 반영한다.
+  useEffect(() => {
+    if (!code || !roomId) return;
+    const playersRef = collection(db, 'sessions', code, 'rooms', roomId, 'players');
+    const unsubscribe = onSnapshot(playersRef, (snapshot) => {
+      const roster = [];
+      snapshot.forEach((d) => {
+        const data = d.data();
+        roster.push({
+          id: d.id,
+          name: data.nickname,
+          character: {
+            color: data.color === 'rainbow' ? 'rainbow' : `var(--color-${data.color})`,
+            label: data.color + ' 행성'
+          },
+          joinedAt: data.joinedAt || Date.now()
+        });
+      });
+      roster.sort((a, b) => a.joinedAt - b.joinedAt);
+
+      setPlayers((prev) => roster.map((r) => {
+        const existing = prev.find((p) => p.id === r.id);
+        return existing
+          ? { ...existing, name: r.name, character: r.character, joinedAt: r.joinedAt }
+          : { ...r, position: 0, skipTurn: false };
+      }));
+    });
+    return () => unsubscribe();
+  }, [code, roomId]);
+
   // Subscribe to Game State
   useEffect(() => {
     const unsubscribe = onSnapshot(gameStateRef, (docSnap) => {
@@ -330,9 +362,26 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
     if (space && space.type === 'category') {
       const catMissions = missions[space.name];
       if (catMissions && catMissions.length > 0) {
-        const otherPlayers = currentPlayers.filter(p => p.id !== activePlayer.id);
+        // 자기 자신 제외 + 같은 playerId 중복 제거(안전장치)
+        const seenIds = new Set();
+        const otherPlayers = currentPlayers.filter(p => {
+          if (!p || !p.id || p.id === activePlayer.id) return false;
+          if (seenIds.has(p.id)) return false;
+          seenIds.add(p.id);
+          return true;
+        });
+
         if (otherPlayers.length > 0) {
-          const chosenTarget = otherPlayers[Math.floor(Math.random() * otherPlayers.length)];
+          // 직전에 지목당한 사람은 연속으로 걸리지 않게 뺀다.
+          // 단 후보가 2명 이하로 줄어들면 뽑을 사람이 없어지므로 적용하지 않는다.
+          const lastTargetId = snapData.missionState?.targetPlayerId;
+          let candidates = otherPlayers;
+          if (lastTargetId && otherPlayers.length > 2) {
+            const filtered = otherPlayers.filter(p => p.id !== lastTargetId);
+            if (filtered.length > 0) candidates = filtered;
+          }
+
+          const chosenTarget = candidates[Math.floor(Math.random() * candidates.length)];
           
           const category = space.name;
           const targetUsedObj = snapData.targetUsedMissions || {};

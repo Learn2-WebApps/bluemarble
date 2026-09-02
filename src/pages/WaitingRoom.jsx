@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { collection, doc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import SpaceBackground from '../components/SpaceBackground';
 import Planet from '../components/Planet';
+import { clearIdentity } from '../utils/playerIdentity';
 
 export default function WaitingRoom({ sessionData, onStartGame, onBack }) {
   const { code, nickname, character } = sessionData;
@@ -14,6 +15,8 @@ export default function WaitingRoom({ sessionData, onStartGame, onBack }) {
       try {
         const playerRef = doc(db, 'sessions', code, 'rooms', sessionData.roomId, 'players', sessionData.playerId);
         await deleteDoc(playerRef);
+        // 스스로 나간 경우이므로 저장된 신원도 지운다. (없는 자리로 복귀 시도하지 않도록)
+        clearIdentity(code);
       } catch (e) {
         console.error("Failed to delete player doc:", e);
       }

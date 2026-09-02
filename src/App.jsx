@@ -19,6 +19,13 @@ function App() {
 
   const [adminSessions, setAdminSessions] = useState([]); // { code, rooms: [{id, players}], status: 'waiting' | 'playing', startedAt: null }
 
+  // 튕겼다가 돌아온 참가자: 캐릭터 선택을 건너뛰고 원래 자리로 바로 복귀시킨다.
+  const handleResume = (restored) => {
+    const { isStarted, ...restoredSession } = restored;
+    setSessionData(restoredSession);
+    setCurrentScreen(isStarted ? 'gameBoard' : 'waitingRoom');
+  };
+
   const handleEnterRoom = (code, nickname) => {
     setSessionData({ ...sessionData, code, nickname });
     setCurrentScreen('roomList');
@@ -64,7 +71,7 @@ function App() {
 
   return (
     <>
-      {currentScreen === 'start' && <Start onEnter={handleEnterRoom} onAdmin={handleEnterAdminLogin} />}
+      {currentScreen === 'start' && <Start onEnter={handleEnterRoom} onResume={handleResume} onAdmin={handleEnterAdminLogin} />}
       {currentScreen === 'adminLogin' && (
         <AdminLogin 
           onLogin={handleAdminLoginSuccess}

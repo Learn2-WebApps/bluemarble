@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { createPlayerId, loadIdentity, saveIdentity } from '../utils/playerIdentity';
 import SpaceBackground from '../components/SpaceBackground';
 import Planet from '../components/Planet';
 
@@ -50,14 +51,24 @@ export default function CharacterSelect({ sessionData, onSelectCharacter, onBack
     
     setIsSubmitting(true);
     try {
-      const playerId = Math.random().toString(36).substring(2, 9);
+      // 이 세션에서 이미 발급받은 신원이 있으면 재사용한다. (뒤로가기 등으로 중복 생성되는 것 방지)
+      const saved = loadIdentity(sessionData.code);
+      const playerId = saved?.playerId || createPlayerId();
+
       const playerRef = doc(db, 'sessions', sessionData.code, 'rooms', sessionData.roomId, 'players', playerId);
       await setDoc(playerRef, {
         nickname: sessionData.nickname,
         color: selectedShipId,
         joinedAt: Date.now()
       });
-      
+
+      // 이후 튕기더라도 이 신원으로 원래 자리에 돌아올 수 있게 저장해 둔다.
+      saveIdentity(sessionData.code, {
+        playerId,
+        roomId: sessionData.roomId,
+        nickname: sessionData.nickname
+      });
+
       const selectedShip = ships.find(s => s.id === selectedShipId);
       onSelectCharacter(selectedShip, playerId);
     } catch (error) {

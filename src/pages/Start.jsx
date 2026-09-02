@@ -1,13 +1,51 @@
 import { useState } from 'react';
 import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import SpaceBackground from '../components/SpaceBackground';
+import { loadIdentity, saveIdentity } from '../utils/playerIdentity';
 
-export default function Start({ onEnter, onAdmin }) {
+export default function Start({ onEnter, onResume, onAdmin }) {
   const [sessionCode, setSessionCode] = useState('');
   const [nickname, setNickname] = useState('');
   const [errors, setErrors] = useState({ code: false, name: false });
   const [alertMsg, setAlertMsg] = useState('');
+
+  // 이 세션에 이미 존재하는 내 플레이어 문서를 찾는다. 없으면 null.
+  // allowNicknameMatch: 닉네임만으로 기존 자리에 붙는 것을 허용할지 여부.
+  // 아직 시작 전인 세션에서는 신규 참가자가 우연히 같은 닉네임으로 남의 자리를
+  // 가로챌 수 있으므로, 저장된 신원이 정확히 일치할 때만 복귀시킨다.
+  const findExistingPlayer = async (code, name, allowNicknameMatch) => {
+    const roomsSnap = await getDocs(collection(db, 'sessions', code, 'rooms'));
+    const saved = loadIdentity(code);
+    const trimmedName = name.trim();
+
+    let nicknameMatch = null;
+
+    for (const roomDoc of roomsSnap.docs) {
+      const playersSnap = await getDocs(
+        collection(db, 'sessions', code, 'rooms', roomDoc.id, 'players')
+      );
+      for (const playerDoc of playersSnap.docs) {
+        const data = playerDoc.data();
+        const found = {
+          playerId: playerDoc.id,
+          roomId: roomDoc.id,
+          nickname: data.nickname,
+          character: {
+            id: data.color,
+            color: data.color === 'rainbow' ? 'rainbow' : `var(--color-${data.color})`,
+            label: data.color + ' 행성'
+          }
+        };
+        // 저장된 신원이 실제 명단에 살아 있으면 그것을 최우선으로 쓴다.
+        if (saved && saved.playerId === playerDoc.id) return found;
+        // 백업 경로: 닉네임이 같은 기존 문서 (첫 번째 것만 사용)
+        if (allowNicknameMatch && !nicknameMatch && data.nickname === trimmedName) nicknameMatch = found;
+      }
+    }
+
+    return nicknameMatch;
+  };
 
   const handleEnter = async (e) => {
     e.preventDefault();
@@ -25,7 +63,28 @@ export default function Start({ onEnter, onAdmin }) {
 
       if (sessionSnap.exists()) {
         const sessionData = sessionSnap.data();
-        if (sessionData.isStarted) {
+
+        // 이미 이 세션에 자리가 있는 참가자인지 먼저 확인한다.
+        // 1순위: localStorage 에 저장된 신원, 2순위: 닉네임으로 조회 (폰 교체/시크릿 모드 대비)
+        const returning = await findExistingPlayer(sessionCode, nickname, !!sessionData.isStarted);
+
+        if (returning) {
+          // 복귀자는 캐릭터 선택을 다시 거치지 않고 원래 자리로 바로 돌아간다.
+          saveIdentity(sessionCode, {
+            playerId: returning.playerId,
+            roomId: returning.roomId,
+            nickname: returning.nickname
+          });
+          onResume({
+            code: sessionCode,
+            nickname: returning.nickname,
+            roomId: returning.roomId,
+            playerId: returning.playerId,
+            character: returning.character,
+            isStarted: !!sessionData.isStarted
+          });
+        } else if (sessionData.isStarted) {
+          // 저장된 신원도 없고 명단에도 없으면 신규 난입이므로 계속 막는다.
           setAlertMsg("이미 게임이 시작된 탐험 코드입니다.");
         } else {
           onEnter(sessionCode, nickname);
