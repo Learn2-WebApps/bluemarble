@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
-import { doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc, runTransaction } from 'firebase/firestore';
 import SpaceBackground from '../components/SpaceBackground';
 import BoardSpace from '../components/BoardSpace';
 import Dice from '../components/Dice';
@@ -26,6 +26,7 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
   const lastDiceTrigger = useRef(null);
   const lastKeyTrigger = useRef(null);
   const isRollingRef = useRef(false);
+  const resolvingMissionRef = useRef(null);
 
   const gameStateRef = doc(db, 'sessions', code, 'rooms', roomId, 'gameState', 'state');
 
@@ -144,6 +145,55 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
     });
     return () => unsubscribe();
   }, [roomId]);
+
+  // 예측과 실제 답이 "일치하는 순간" 예측자에게 깃발 +1.
+  // 버튼 클릭과 무관하므로 새로고침/이탈/타이머 만료에도 반영이 보장된다.
+  // missionState.isResolved 를 트랜잭션 안에서 검사·기록하여 중복 지급을 막는다.
+  useEffect(() => {
+    const ms = gameState?.missionState;
+    if (!ms || !ms.data) return;
+    if (ms.prediction === null || ms.actualAnswer === null) return;
+    if (ms.prediction !== ms.actualAnswer) return;
+    if (ms.isResolved) return;
+
+    // 재렌더링으로 같은 미션에 대해 트랜잭션이 여러 번 시작되는 것을 막는다.
+    const missionKey = `${ms.activePlayerId}-${ms.spaceId}-${ms.prediction}-${ms.actualAnswer}`;
+    if (resolvingMissionRef.current === missionKey) return;
+    resolvingMissionRef.current = missionKey;
+
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(gameStateRef);
+      if (!snap.exists()) return;
+      const cur = snap.data();
+      const curMs = cur.missionState;
+
+      // 여러 브라우저가 동시에 시도해도 최초 1회만 통과하도록 서버 값으로 재검증한다.
+      if (!curMs || curMs.isResolved) return;
+      if (curMs.prediction === null || curMs.actualAnswer === null) return;
+      if (curMs.prediction !== curMs.actualAnswer) return;
+      if (curMs.spaceId !== ms.spaceId || curMs.activePlayerId !== ms.activePlayerId) return;
+
+      // 깊은 복사: 칸별 소유 맵까지 새 객체로 만들어 state 직접 변경을 피한다.
+      const prevOwnership = cur.landOwnership || {};
+      const newOwnership = {};
+      Object.keys(prevOwnership).forEach((k) => {
+        newOwnership[k] = { ...prevOwnership[k] };
+      });
+
+      const sid = curMs.spaceId;
+      const winnerId = curMs.activePlayerId; // 예측한 사람에게 지급
+      if (!newOwnership[sid]) newOwnership[sid] = {};
+      newOwnership[sid][winnerId] = (newOwnership[sid][winnerId] || 0) + 1;
+
+      tx.update(gameStateRef, {
+        landOwnership: newOwnership,
+        'missionState.isResolved': true
+      });
+    }).catch((err) => {
+      console.error('미션 깃발 반영 실패:', err);
+      resolvingMissionRef.current = null; // 실패 시 재시도 허용
+    });
+  }, [gameState]);
 
   const playLocalDiceAnimation = (face, turnIndex, snapData) => {
     // Visual movement logic
@@ -437,21 +487,9 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
     setStealState({ isOpen: false });
   };
 
-  const handleMissionSuccess = async () => {
-    if (!gameState || gameState.missionState.activePlayerId !== playerId) return;
-    
-    const sid = gameState.missionState.spaceId;
-    const newOwnership = { ...landOwnership };
-    if (!newOwnership[sid]) newOwnership[sid] = {};
-    newOwnership[sid][playerId] = (newOwnership[sid][playerId] || 0) + 1;
-
-    await updateDoc(gameStateRef, {
-      landOwnership: newOwnership,
-      'missionState.isOpen': false,
-      turnIndex: ((gameState.turnIndex || 0) + 1) % players.length,
-      'diceState.isRolling': false
-    });
-  };
+  // 깃발 +1 은 예측과 실제 답이 일치하는 순간(위쪽 useEffect)에서만 처리한다.
+  // 여기서는 턴만 넘긴다. (버튼 클릭으로 중복 지급되는 것을 막기 위함)
+  const handleMissionSuccess = () => handleMissionFailOrClose();
 
   const handleMissionFailOrClose = async () => {
     if (!gameState || gameState.missionState.activePlayerId !== playerId) return;
