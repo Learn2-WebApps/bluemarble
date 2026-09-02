@@ -148,7 +148,14 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
 
   // Subscribe to Game State
   useEffect(() => {
-    const unsubscribe = onSnapshot(gameStateRef, (docSnap) => {
+    // [임시 진단] fromCache 전환을 관찰하려면 metadata 변경도 받아야 한다.
+    const unsubscribe = onSnapshot(gameStateRef, { includeMetadataChanges: true }, (docSnap) => {
+      // [임시 진단 로그] 폰에서 리슨 스트림이 살아 있는지 확인용. 확인 후 제거 예정.
+      console.log('[SYNC]', new Date().toISOString(), {
+        fromCache: docSnap.metadata.fromCache,
+        pending: docSnap.metadata.hasPendingWrites
+      });
+
       if (docSnap.exists()) {
         const data = docSnap.data();
         setGameState(data);
@@ -232,6 +239,9 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
   }, [gameState]);
 
   const playLocalDiceAnimation = (face, turnIndex, snapData) => {
+    // [임시 진단 로그] 애니메이션이 실제로 몇 초를 잡아먹는지 측정용. 확인 후 제거 예정.
+    console.log('[DICE] anim start', new Date().toISOString(), { face });
+
     // Visual movement logic
     setTimeout(() => {
       let stepsTaken = 0;
@@ -256,6 +266,8 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
             const activePlayer = latestPlayers[turnIndex];
             if (activePlayer && activePlayer.id === playerId) {
               setTimeout(() => {
+                // [임시 진단 로그] anim start 와의 차이가 곧 구조적 고정 지연이다.
+                console.log('[DICE] arrival ->', new Date().toISOString(), { face });
                 handleArrival(activePlayer, face, snapData, latestPlayers);
               }, 400);
             }
