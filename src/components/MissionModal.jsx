@@ -20,26 +20,6 @@ export default function MissionModal({ isOpen, missionState, players, myPlayerId
   const activePlayer = players.find(p => p.id === activePlayerId);
   const targetPlayer = players.find(p => p.id === targetPlayerId);
 
-  // ── [임시 진단 로그] 미션 표시 타이밍 원인 확정용. 확인 후 제거 예정. ──
-  // 동작에는 영향을 주지 않으며, 아래 게이트의 판정 근거만 그대로 출력한다.
-  const gateInfo = {
-    isOpen,
-    playersLength: players.length,
-    playerIds: players.map(p => p.id),
-    activePlayerId,
-    targetPlayerId,
-    activePlayerFound: !!activePlayer,
-    targetPlayerFound: !!targetPlayer,
-    myPlayerId,
-    at: new Date().toISOString()
-  };
-  if (!activePlayer || !targetPlayer) {
-    console.log('[MissionModal] BLOCKED by players gate', gateInfo);
-  } else {
-    console.log('[MissionModal] players gate PASSED', gateInfo);
-  }
-  // ── [임시 진단 로그] 끝 ──
-
   if (!activePlayer || !targetPlayer) return null;
 
   const isPredictor = myPlayerId === activePlayerId;

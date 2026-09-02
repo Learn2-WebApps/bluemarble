@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -13,6 +13,11 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+
+// 모바일 네트워크나 프록시에서 WebSocket 이 막히면 실시간 수신이 10초 가까이 지연된다.
+// 자동 감지를 켜두면 그런 환경에서 long polling 으로 즉시 전환된다.
+const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true
+});
 
 export { app, db };

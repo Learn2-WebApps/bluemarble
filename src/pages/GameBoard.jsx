@@ -134,19 +134,14 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
       });
       roster.sort((a, b) => a.joinedAt - b.joinedAt);
 
-      // [임시 진단 로그] 명단이 언제 채워지는지 타임라인 확인용. 확인 후 제거 예정.
-      console.log('[GameBoard] players snapshot updated', {
-        length: roster.length,
-        ids: roster.map((r) => r.id),
-        at: new Date().toISOString()
-      });
-
       setPlayers((prev) => roster.map((r) => {
         const existing = prev.find((p) => p.id === r.id);
         return existing
           ? { ...existing, name: r.name, character: r.character, joinedAt: r.joinedAt }
           : { ...r, position: 0, skipTurn: false };
       }));
+    }, (error) => {
+      console.error('[Firestore] players 구독 오류:', error);
     });
     return () => unsubscribe();
   }, [code, roomId]);
@@ -181,6 +176,8 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
           playLocalKeyAnimation(data.goldenKeyMoveAnim, data);
         }
       }
+    }, (error) => {
+      console.error('[Firestore] gameState 구독 오류:', error);
     });
     return () => unsubscribe();
   }, [roomId]);
