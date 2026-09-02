@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { createPlayerId, loadIdentity, saveIdentity } from '../utils/playerIdentity';
+import { collection, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { createPlayerId, saveIdentity } from '../utils/playerIdentity';
 import SpaceBackground from '../components/SpaceBackground';
 import Planet from '../components/Planet';
 
@@ -51,18 +51,37 @@ export default function CharacterSelect({ sessionData, onSelectCharacter, onBack
     
     setIsSubmitting(true);
     try {
-      // 이 세션에서 이미 발급받은 신원이 있으면 재사용한다. (뒤로가기 등으로 중복 생성되는 것 방지)
-      const saved = loadIdentity(sessionData.code);
-      const playerId = saved?.playerId || createPlayerId();
+      // 이 화면은 "신규 입장" 전용이다. 저장된 playerId 를 재사용하면 같은 브라우저의
+      // 다른 참가자와 ID 를 공유하게 되어 서로의 문서를 덮어쓴다.
+      // 복귀(재입장)는 Start.jsx 의 검증 경로에서만 처리하므로 여기서는 항상 새로 발급한다.
+      const playersPath = ['sessions', sessionData.code, 'rooms', sessionData.roomId, 'players'];
 
-      const playerRef = doc(db, 'sessions', sessionData.code, 'rooms', sessionData.roomId, 'players', playerId);
+      let playerId = null;
+      let playerRef = null;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const candidateId = createPlayerId();
+        const candidateRef = doc(db, ...playersPath, candidateId);
+        // 이미 쓰이는 ID 면 남의 문서를 덮어쓰게 되므로 다시 뽑는다.
+        const existing = await getDoc(candidateRef);
+        if (!existing.exists()) {
+          playerId = candidateId;
+          playerRef = candidateRef;
+          break;
+        }
+      }
+
+      if (!playerId) {
+        throw new Error('사용 가능한 playerId 를 발급하지 못했습니다.');
+      }
+
+      // 위에서 문서가 없음을 확인했으므로 이 setDoc 은 기존 참가자를 덮어쓰지 않는다.
       await setDoc(playerRef, {
         nickname: sessionData.nickname,
         color: selectedShipId,
         joinedAt: Date.now()
       });
 
-      // 이후 튕기더라도 이 신원으로 원래 자리에 돌아올 수 있게 저장해 둔다.
+      // 방금 발급한 신원만 저장한다. 이후 크래시/새로고침 시 복귀에 쓰인다.
       saveIdentity(sessionData.code, {
         playerId,
         roomId: sessionData.roomId,
