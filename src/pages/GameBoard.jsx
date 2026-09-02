@@ -27,6 +27,9 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
   const lastKeyTrigger = useRef(null);
   const isRollingRef = useRef(false);
   const resolvingMissionRef = useRef(null);
+  // [임시 진단 표시] 폰에서 콘솔 없이 동기화 상태를 확인하기 위한 값. 진단 후 제거 예정.
+  const [debugInfo, setDebugInfo] = useState({ fromCache: null, lastAt: null, diceMs: null });
+  const diceStartRef = useRef(null);
 
   const gameStateRef = doc(db, 'sessions', code, 'rooms', roomId, 'gameState', 'state');
 
@@ -155,6 +158,11 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
         fromCache: docSnap.metadata.fromCache,
         pending: docSnap.metadata.hasPendingWrites
       });
+      setDebugInfo((prev) => ({
+        ...prev,
+        fromCache: docSnap.metadata.fromCache,
+        lastAt: new Date().toLocaleTimeString('en-GB')
+      }));
 
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -241,6 +249,7 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
   const playLocalDiceAnimation = (face, turnIndex, snapData) => {
     // [임시 진단 로그] 애니메이션이 실제로 몇 초를 잡아먹는지 측정용. 확인 후 제거 예정.
     console.log('[DICE] anim start', new Date().toISOString(), { face });
+    diceStartRef.current = Date.now();
 
     // Visual movement logic
     setTimeout(() => {
@@ -260,6 +269,11 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
         if (stepsTaken >= face) {
           clearInterval(moveInterval);
           isRollingRef.current = false; // Release lock
+
+          // [임시 진단 표시] 주사위를 굴리지 않은 기기에서도 소요 시간이 보이도록 한다.
+          if (diceStartRef.current) {
+            setDebugInfo((prev) => ({ ...prev, diceMs: Date.now() - diceStartRef.current }));
+          }
           
           // Only turn owner computes logic and updates DB
           setPlayers(latestPlayers => {
@@ -268,6 +282,9 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
               setTimeout(() => {
                 // [임시 진단 로그] anim start 와의 차이가 곧 구조적 고정 지연이다.
                 console.log('[DICE] arrival ->', new Date().toISOString(), { face });
+                if (diceStartRef.current) {
+                  setDebugInfo((prev) => ({ ...prev, diceMs: Date.now() - diceStartRef.current }));
+                }
                 handleArrival(activePlayer, face, snapData, latestPlayers);
               }, 400);
             }
@@ -652,11 +669,31 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
           onHome={onHome} 
         />
       )}
+
+      {/* [임시 진단 표시] 진단이 끝나면 이 블록과 styles.debugOverlay 를 제거한다. */}
+      <div style={styles.debugOverlay}>
+        cache:{String(debugInfo.fromCache)} | last:{debugInfo.lastAt || '-'} | dice:{debugInfo.diceMs != null ? (debugInfo.diceMs / 1000).toFixed(1) + 's' : '-'}
+      </div>
     </div>
   );
 }
 
 const styles = {
+  // [임시 진단 표시] 진단 후 제거 예정.
+  debugOverlay: {
+    position: 'fixed',
+    right: '6px',
+    bottom: '6px',
+    zIndex: 3000,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    color: '#fff',
+    fontSize: '10px',
+    fontFamily: 'monospace',
+    padding: '4px 7px',
+    borderRadius: '4px',
+    whiteSpace: 'nowrap',
+    pointerEvents: 'none',
+  },
   container: {
     width: '100vw',
     height: '100dvh',

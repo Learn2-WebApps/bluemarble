@@ -14,10 +14,10 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// 모바일 네트워크나 프록시에서 WebSocket 이 막히면 실시간 수신이 10초 가까이 지연된다.
-// 자동 감지를 켜두면 그런 환경에서 long polling 으로 즉시 전환된다.
+// 모바일에서는 WebSocket 이 연결만 되고 데이터가 흐르지 않는 경우가 있어 자동 감지가
+// 실패했다. 매번 가능 여부를 재보는 대신 처음부터 long polling 으로 고정한다.
 const db = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true
+  experimentalForceLongPolling: true
 });
 
 export { app, db };
