@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { updateDoc } from 'firebase/firestore';
 
+// 결과 문구 색상. 모달 배경이 노란색이라 팔레트의 밝은 blue/red 는 대비가 약해
+// 같은 계열의 진한 톤을 쓴다. (예측자·지목 대상·제3자 화면에 동일하게 적용된다)
+const SUCCESS_COLOR = '#1565C0';
+const FAIL_COLOR = '#C62828';
+
 export default function MissionModal({ isOpen, missionState, players, myPlayerId, gameStateRef, onClose, onSuccess }) {
   const [localPrediction, setLocalPrediction] = useState(null);
   const [localActualAnswer, setLocalActualAnswer] = useState(null);
@@ -164,7 +169,7 @@ export default function MissionModal({ isOpen, missionState, players, myPlayerId
           <div style={styles.phaseContainer}>
             <h3 style={styles.instruction}>
               결과 확인!<br/>
-              <span style={{ fontSize: '1.1rem', color: 'gray' }}>
+              <span style={{ fontSize: '1.1rem', color: prediction === actualAnswer ? SUCCESS_COLOR : FAIL_COLOR }}>
                 {prediction === actualAnswer ? '예측 성공! 🎉' : '예측 실패! 💦'}
               </span>
             </h3>
