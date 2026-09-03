@@ -613,6 +613,28 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
     });
   };
 
+  // === TEST MODE START ===
+  // 임시 테스트 패널. 황금열쇠를 "실제 뽑기와 동일한 경로"로 발동시키기 위한 껍데기다.
+  // 실제 뽑기(handleSpaceArrival 의 goldenKey 분기)가 하는 일과 똑같이 goldenKeyState 만
+  // 써 넣는다. 그러면 GoldenKeyModal 이 평소처럼 열리고, 확인을 누르면 실제
+  // handleGoldenKeyApply 가 그대로 돈다. 효과를 흉내내는 코드는 여기에 하나도 없다.
+  // 카드는 현재 차례인 사람(주사위를 굴릴 수 있는 사람) 앞으로 발동된다.
+  const [testPanelOpen, setTestPanelOpen] = useState(false);
+
+  const triggerTestGoldenKey = async (card) => {
+    if (!gameState || players.length === 0) return;
+    const turnOwner = players[(gameState.turnIndex || 0) % players.length];
+    if (!turnOwner) return;
+    await updateDoc(gameStateRef, {
+      goldenKeyState: {
+        isOpen: true,
+        card: card,
+        activePlayerId: turnOwner.id
+      }
+    });
+  };
+  // === TEST MODE END ===
+
   if (!gameState || players.length === 0) return null;
 
   const safeTurnIndex = (gameState.turnIndex || 0) % players.length;
@@ -700,11 +722,89 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
           onHome={onHome} 
         />
       )}
+
+      {/* === TEST MODE START === */}
+      <div style={styles.testPanel}>
+        <button style={styles.testPanelToggle} onClick={() => setTestPanelOpen((v) => !v)}>
+          {testPanelOpen ? '⚠️ TEST MODE ▼' : '⚠️ TEST MODE ▲'}
+        </button>
+        {testPanelOpen && (
+          <div style={styles.testPanelBody}>
+            <div style={styles.testPanelNote}>
+              황금열쇠 강제 발동 · 현재 차례: {currentPlayer?.name || '-'}
+            </div>
+            {goldenKeys.map((card) => (
+              <button
+                key={card.id}
+                style={styles.testPanelButton}
+                onClick={() => triggerTestGoldenKey(card)}
+              >
+                {card.id}. {card.title}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {/* === TEST MODE END === */}
     </div>
   );
 }
 
 const styles = {
+  // === TEST MODE START ===
+  testPanel: {
+    position: 'fixed',
+    left: '6px',
+    bottom: '6px',
+    zIndex: 3000,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: '4px',
+  },
+  testPanelToggle: {
+    fontFamily: 'monospace',
+    fontSize: '11px',
+    fontWeight: 'bold',
+    color: '#fff',
+    backgroundColor: '#c62828',
+    border: '2px solid #fff',
+    borderRadius: '4px',
+    padding: '4px 8px',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
+  testPanelBody: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '3px',
+    padding: '6px',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    border: '2px dashed #ff5252',
+    borderRadius: '6px',
+    maxHeight: '60dvh',
+    overflowY: 'auto',
+  },
+  testPanelNote: {
+    fontFamily: 'monospace',
+    fontSize: '10px',
+    color: '#ff8a80',
+    marginBottom: '2px',
+    whiteSpace: 'nowrap',
+  },
+  testPanelButton: {
+    fontFamily: 'monospace',
+    fontSize: '11px',
+    textAlign: 'left',
+    color: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    border: '1px solid #ff5252',
+    borderRadius: '4px',
+    padding: '4px 6px',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
+  // === TEST MODE END ===
   container: {
     width: '100vw',
     height: '100dvh',
