@@ -373,10 +373,11 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
 
         if (otherPlayers.length > 0) {
           // 직전에 지목당한 사람은 연속으로 걸리지 않게 뺀다.
-          // 단 후보가 2명 이하로 줄어들면 뽑을 사람이 없어지므로 적용하지 않는다.
+          // 인원수로 막지 않고, 뺐을 때 후보가 최소 1명 남는 경우에만 적용한다.
+          // (2인 플레이에서 하나뿐인 상대가 직전 대상이면 filtered 가 비므로 그대로 둔다.)
           const lastTargetId = snapData.missionState?.targetPlayerId;
           let candidates = otherPlayers;
-          if (lastTargetId && otherPlayers.length > 2) {
+          if (lastTargetId) {
             const filtered = otherPlayers.filter(p => p.id !== lastTargetId);
             if (filtered.length > 0) candidates = filtered;
           }
