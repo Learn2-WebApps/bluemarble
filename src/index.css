@@ -30,6 +30,12 @@ body {
   color: var(--color-white);
   min-height: 100vh;
   overflow-x: hidden;
+  /* 한국어 가독성: 줄바꿈을 어절(띄어쓰기) 단위로만 일어나게 한다.
+     둘 다 상속되는 속성이라 여기 한 번만 걸면 대기실·문제·결과·보드·모달 등
+     하위 모든 텍스트가 물려받는다.
+     break-word 는 URL 처럼 띄어쓰기 없는 긴 문자열이 칸을 넘칠 때만 쓰이는 예외 장치. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
   /* Basic starry background with noise overlay effect simulated by radial gradients */
   background-image: 
     radial-gradient(2px 2px at 20px 30px, #ffffff, rgba(0,0,0,0)),
