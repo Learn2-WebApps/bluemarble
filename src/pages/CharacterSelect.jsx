@@ -97,19 +97,19 @@ export default function CharacterSelect({ sessionData, onSelectCharacter, onBack
   };
 
   return (
-    <div style={styles.container}>
+    <div className="character-select-container" style={styles.container}>
       <SpaceBackground />
 
-      <div className="card-wobbly" style={styles.card}>
+      <div className="card-wobbly character-select-card" style={styles.card}>
         <div style={styles.header}>
           <button onClick={onBack} className="btn-wobbly" style={styles.backButton}>◀ 뒤로</button>
-          <h1 style={styles.title}>내 <span style={{ color: 'var(--color-yellow)' }}>행성</span> 선택</h1>
+          <h1 className="select-title" style={styles.title}>내 <span style={{ color: 'var(--color-yellow)' }}>행성</span> 선택</h1>
           <div style={{ width: '80px' }}></div> {/* For flex centering balance */}
         </div>
         
-        <p style={styles.subtitle}>탐험을 함께할 나만의 행성을 골라주세요!</p>
+        <p className="select-subtitle" style={styles.subtitle}>탐험을 함께할 나만의 행성을 골라주세요!</p>
 
-        <div style={styles.shipGrid}>
+        <div className="ship-grid" style={styles.shipGrid}>
           {ships.map((ship) => (
             <div 
               key={ship.id} 
@@ -127,7 +127,7 @@ export default function CharacterSelect({ sessionData, onSelectCharacter, onBack
               }}
             >
               <Planet color={ship.color} isLocked={ship.isLocked} />
-              <h3 style={styles.shipLabel}>{ship.label}</h3>
+              <h3 className="ship-label" style={styles.shipLabel}>{ship.label}</h3>
               {ship.isLocked && <span style={styles.lockedText}>{ship.owner}</span>}
               {!ship.isLocked && selectedShipId === ship.id && <span style={styles.selectedText}>선택됨!</span>}
             </div>
@@ -135,7 +135,7 @@ export default function CharacterSelect({ sessionData, onSelectCharacter, onBack
         </div>
 
         <button 
-          className="btn-wobbly" 
+          className="btn-wobbly select-confirm" 
           style={{ ...styles.confirmButton, opacity: selectedShipId ? 1 : 0.5 }}
           onClick={handleConfirm}
         >
@@ -149,7 +149,8 @@ export default function CharacterSelect({ sessionData, onSelectCharacter, onBack
 const styles = {
   container: {
     width: '100vw',
-    height: '100vh',
+    // 모바일 브라우저 주소창을 뺀 실제 높이. 100vh 면 아래가 잘려 스크롤이 생긴다.
+    height: '100dvh',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
@@ -197,7 +198,8 @@ const styles = {
   shipGrid: {
     width: '100%',
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+    // 기본 2열(폰에서 6개가 2x3). 넓은 화면에서는 index.css 가 3열로 넓힌다.
+    gridTemplateColumns: 'repeat(2, 1fr)',
     gap: '20px',
     padding: '10px',
     marginBottom: '20px',

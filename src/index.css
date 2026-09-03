@@ -210,3 +210,54 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 15px;
 }
+
+/* ── 행성 선택(대기실) 화면 레이아웃 ─────────────────────────────────────
+   폰에서 행성 카드 6개가 1열로 늘어서 다 보려면 스크롤이 필요했다.
+   기본을 2열로 두고, 모바일에서는 카드 안팎의 여백·글자·행성 크기를 줄여
+   2x3 + 제목 + "준비 완료" 버튼이 한 화면에 들어오게 한다.
+   선택 로직에는 관여하지 않는 순수 레이아웃 규칙이며, 클래스명은 이 화면에서만 쓴다. */
+
+/* 넓은 화면에서는 3열로 펼쳐 6개를 3x2 로 보여 준다. */
+@media (min-width: 768px) {
+  .ship-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .character-select-container {
+    padding: 10px !important;
+  }
+  .character-select-card {
+    padding: 14px !important;
+  }
+  .select-title {
+    font-size: 1.5rem !important;
+  }
+  .select-subtitle {
+    font-size: 0.9rem !important;
+    margin-bottom: 8px !important;
+  }
+  .ship-grid {
+    gap: 8px !important;
+    padding: 0 !important;
+    margin-bottom: 10px !important;
+  }
+  .ship-card {
+    padding: 8px !important;
+    gap: 4px !important;
+    border-width: 3px !important;
+  }
+  /* Planet 의 svg width/height 속성을 CSS 로 덮어써서 2열에 맞게 줄인다. */
+  .ship-card svg {
+    width: 56px !important;
+    height: 56px !important;
+  }
+  .ship-label {
+    font-size: 0.85rem !important;
+  }
+  .select-confirm {
+    font-size: 1.05rem !important;
+    padding: 10px 20px !important;
+  }
+}
