@@ -167,11 +167,8 @@ export default function MissionModal({ isOpen, missionState, players, myPlayerId
           </div>
         ) : (
           <div style={styles.phaseContainer}>
-            <h3 style={styles.instruction}>
-              결과 확인!<br/>
-              <span style={{ fontSize: '1.1rem', color: prediction === actualAnswer ? SUCCESS_COLOR : FAIL_COLOR }}>
-                {prediction === actualAnswer ? '예측 성공! 🎉' : '예측 실패! 💦'}
-              </span>
+            <h3 style={{ ...styles.resultHeadline, color: prediction === actualAnswer ? SUCCESS_COLOR : FAIL_COLOR }}>
+              {prediction === actualAnswer ? '예측 성공! 🎉' : '예측 실패! 💦'}
             </h3>
             <div style={styles.optionsList}>
               {data.options.map((opt, i) => {
@@ -222,7 +219,7 @@ export default function MissionModal({ isOpen, missionState, players, myPlayerId
               </button>
             )}
             {!isPredictor && (
-              <h3 style={{ marginTop: '30px', color: '#555' }}>{activePlayer.name}님이 턴을 넘기기를 기다리는 중...</h3>
+              <h3 style={styles.waitingNotice}>{activePlayer.name}님이 턴을 넘기기를 기다리는 중...</h3>
             )}
           </div>
         )}
@@ -252,6 +249,16 @@ const styles = {
     textAlign: 'center', marginBottom: '30px', wordBreak: 'keep-all', whiteSpace: 'pre-wrap',
   },
   phaseContainer: { width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  // 결과 화면의 메인 제목. h1~h6 전역 text-shadow 를 끄고 크기만 키운다. 색은 호출부에서 넣는다.
+  resultHeadline: {
+    fontSize: '2.2rem', fontWeight: 'bold', textAlign: 'center',
+    marginTop: 0, marginBottom: '20px', textShadow: 'none',
+  },
+  // 대기 문구. 선택지(optionBtn) 와 같은 글씨체를 쓰고 전역 text-shadow 를 끈다.
+  waitingNotice: {
+    marginTop: '30px', color: '#555', textShadow: 'none',
+    fontFamily: '"Noto Sans KR", "Apple SD Gothic Neo", sans-serif',
+  },
   instruction: { fontSize: '1.4rem', color: 'var(--color-black)', textAlign: 'center', marginBottom: '20px', textShadow: 'none' },
   optionsList: { width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' },
   optionBtn: {
