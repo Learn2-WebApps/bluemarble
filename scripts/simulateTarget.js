@@ -1,26 +1,36 @@
 /**
  * 지목 대상(예측 당하는 사람) 선정 규칙 검증용 시뮬레이터.
  *
- * src/pages/GameBoard.jsx 의 handleSpaceArrival 안에 있는 후보 선정 구간을
- * 순수 함수로 그대로 복제해서, Firestore·브라우저 없이 통계만 뽑는다.
- * 게임 코드를 고치면 아래 pickTarget 도 같은 규칙으로 맞춰 주어야 한다.
- *
+ * Firestore·브라우저 없이 순수 JS 로만 통계를 뽑는다.
  * 실행: node scripts/simulateTarget.js
+ *
+ * 시나리오
+ *   A  (현재 규칙)  src/pages/GameBoard.jsx 의 handleSpaceArrival 후보 선정 구간 복제.
+ *                   예측자 자신 제외 + 직전에 지목당한 사람 1명 제외.
+ *   B  (제안 규칙)  A 에 더해 "예측자가 직전에 붙었던 상대" 1명도 제외.
+ *                   붙은 두 사람이 서로를 기억한다 (lastOpponent 양쪽 갱신).
+ *   B2 (제안 변형)  B 와 같되 예측자 쪽만 기억한다 (lastOpponent 예측자만 갱신).
+ *
+ * B / B2 에서 둘 다 빼면 후보가 0명이 되는 경우가 이번 시뮬레이션의 핵심 관심사다.
+ * 그 상황은 횟수만 세어 두고, 진행은 임시로 "직전 지목 대상만 제외" 로 되돌린다.
+ * (fallback 우선순위는 아직 정하지 않았으므로 어디까지나 임시 처리다.)
  */
 
 // ---------------------------------------------------------------------------
-// 1. 지목 대상 선정 로직 (GameBoard.jsx 복제본)
+// 1. 지목 대상 선정 로직
 // ---------------------------------------------------------------------------
 
 /**
- * @param {{id: string}[]} players       방 안의 전체 플레이어
- * @param {string} activePlayerId        이번 차례인 사람 = 예측자
- * @param {string|null} lastTargetId     직전에 지목당한 사람
- * @param {() => number} random          0 이상 1 미만 난수 생성기
- * @returns {{id: string}|null}          이번에 지목당할 사람
+ * @param {{id: string}[]} players     방 안의 전체 플레이어
+ * @param {string} activePlayerId      이번 차례인 사람 = 예측자
+ * @param {string|null} lastTargetId   직전 턴에 지목당한 사람
+ * @param {string|null} lastOpponentId 예측자가 직전에 붙었던 상대 (시나리오 A 는 항상 null)
+ * @param {() => number} random        0 이상 1 미만 난수 생성기
+ * @returns {{target: {id: string}|null, exhausted: boolean}}
+ *          exhausted = 제외 규칙을 다 적용하면 후보가 0명이 되어 임시 fallback 을 쓴 경우
  */
-function pickTarget(players, activePlayerId, lastTargetId, random) {
-  // 자기 자신 제외 + 같은 id 중복 제거
+function pickTarget(players, activePlayerId, lastTargetId, lastOpponentId, random) {
+  // 자기 자신 제외 + 같은 id 중복 제거 (게임 코드와 동일)
   const seenIds = new Set();
   const otherPlayers = players.filter((p) => {
     if (!p || !p.id || p.id === activePlayerId) return false;
@@ -29,18 +39,27 @@ function pickTarget(players, activePlayerId, lastTargetId, random) {
     return true;
   });
 
-  if (otherPlayers.length === 0) return null;
+  if (otherPlayers.length === 0) return { target: null, exhausted: false };
 
-  // 직전에 지목당한 사람은 연속으로 걸리지 않게 뺀다.
-  // 인원수로 막지 않고, 뺐을 때 후보가 최소 1명 남는 경우에만 적용한다.
-  // (2인 플레이에서 하나뿐인 상대가 직전 대상이면 filtered 가 비므로 그대로 둔다.)
   let candidates = otherPlayers;
-  if (lastTargetId) {
-    const filtered = otherPlayers.filter((p) => p.id !== lastTargetId);
-    if (filtered.length > 0) candidates = filtered;
+  let exhausted = false;
+
+  if (lastTargetId || lastOpponentId) {
+    const filtered = otherPlayers.filter(
+      (p) => p.id !== lastTargetId && p.id !== lastOpponentId
+    );
+
+    if (filtered.length > 0) {
+      candidates = filtered;
+    } else {
+      // 관심 지점: 제외 규칙을 다 적용하면 뽑을 사람이 없어지는 상황.
+      exhausted = true;
+      const fallback = otherPlayers.filter((p) => p.id !== lastTargetId);
+      candidates = fallback.length > 0 ? fallback : otherPlayers;
+    }
   }
 
-  return candidates[Math.floor(random() * candidates.length)];
+  return { target: candidates[Math.floor(random() * candidates.length)], exhausted };
 }
 
 // ---------------------------------------------------------------------------
@@ -62,39 +81,58 @@ function mulberry32(seed) {
 
 const TURNS_PER_PLAYER = 20000; // 인원수 × 20000 턴
 
-function simulate(playerCount, seed) {
+const SCENARIOS = {
+  A:  { useLastOpponent: false, symmetric: false },
+  B:  { useLastOpponent: true,  symmetric: true  },
+  B2: { useLastOpponent: true,  symmetric: false },
+};
+
+function simulate(playerCount, seed, scenarioKey, turnsPerPlayer = TURNS_PER_PLAYER) {
+  const { useLastOpponent, symmetric } = SCENARIOS[scenarioKey];
+
   const players = [];
   for (let i = 0; i < playerCount; i++) players.push({ id: `P${i + 1}` });
 
   const random = mulberry32(seed);
-  const totalTurns = playerCount * TURNS_PER_PLAYER;
+  const totalTurns = playerCount * turnsPerPlayer;
 
   const counts = {};
   players.forEach((p) => { counts[p.id] = 0; });
 
+  const lastOpponent = {}; // 플레이어별 "직전에 붙었던 상대" 1명
   let turnIndex = 0;
   let lastTargetId = null;
   let consecutive = 0;
-  let emptyCandidate = 0;
+  let exhaustedCount = 0;
+  let noCandidate = 0;
 
   for (let t = 0; t < totalTurns; t++) {
-    const activePlayer = players[turnIndex];
-    const target = pickTarget(players, activePlayer.id, lastTargetId, random);
+    const activeId = players[turnIndex].id;
+    const { target, exhausted } = pickTarget(
+      players,
+      activeId,
+      lastTargetId,
+      useLastOpponent ? (lastOpponent[activeId] || null) : null,
+      random
+    );
+
+    if (exhausted) exhaustedCount++;
 
     if (!target) {
-      // 후보가 0명이 되는 상황. 절대 나오면 안 된다.
-      emptyCandidate++;
+      noCandidate++; // 후보가 물리적으로 0명. 3명 이상에서는 나올 수 없다.
     } else {
       if (target.id === lastTargetId) consecutive++;
       counts[target.id]++;
       lastTargetId = target.id;
+      lastOpponent[activeId] = target.id;
+      if (symmetric) lastOpponent[target.id] = activeId;
     }
 
     // 실제 게임과 동일하게 다음 차례로 넘어간다.
     turnIndex = (turnIndex + 1) % players.length;
   }
 
-  return { players, totalTurns, counts, consecutive, emptyCandidate };
+  return { players, totalTurns, counts, consecutive, exhaustedCount, noCandidate, n: playerCount };
 }
 
 // ---------------------------------------------------------------------------
@@ -105,41 +143,135 @@ function pct(part, whole) {
   return ((part / whole) * 100).toFixed(2) + '%';
 }
 
-function report(playerCount, seed) {
-  const { players, totalTurns, counts, consecutive, emptyCandidate } = simulate(playerCount, seed);
+function cell(count, total) {
+  return String(count).padStart(8) + '  ' + pct(count, total).padStart(7);
+}
+
+function pair(count, total) {
+  return (String(count) + '회 ' + pct(count, total)).padEnd(20);
+}
+
+function maxSpread(r) {
+  const expected = r.totalTurns / r.n;
+  let worst = 0;
+  r.players.forEach((p) => {
+    const d = Math.abs(r.counts[p.id] - expected) / r.totalTurns * 100;
+    if (d > worst) worst = d;
+  });
+  return '+-' + worst.toFixed(2) + '%p';
+}
+
+function comparePair(playerCount, seed) {
+  const a = simulate(playerCount, seed, 'A');
+  const b = simulate(playerCount, seed, 'B');
   const expected = 100 / playerCount;
 
-  console.log(`=== ${playerCount}명 ===`);
-  console.log(`총 턴 수: ${totalTurns}   (균등 기대치: ${expected.toFixed(2)}%)`);
-  console.log('  플레이어   지목 횟수      비율      기대치 대비');
-  players.forEach((p) => {
-    const c = counts[p.id];
-    const share = (c / totalTurns) * 100;
-    const diff = share - expected;
-    console.log(
-      '  ' + p.id.padEnd(10) +
-      String(c).padStart(9) + '   ' +
-      pct(c, totalTurns).padStart(8) + '   ' +
-      (diff >= 0 ? '+' : '') + diff.toFixed(2) + '%p'
-    );
+  console.log(`=== ${playerCount}명  (총 ${a.totalTurns}턴, 균등 기대치 ${expected.toFixed(2)}%) ===`);
+  console.log('              A: 직전 대상만        B: 직전 대상 + 직전 상대');
+  console.log('  플레이어      횟수     비율          횟수     비율');
+  a.players.forEach((p) => {
+    console.log('  ' + p.id.padEnd(10) + cell(a.counts[p.id], a.totalTurns) + '    ' + cell(b.counts[p.id], b.totalTurns));
   });
-  console.log(`  연속 지목(직전과 동일 대상): ${consecutive}회 (${pct(consecutive, totalTurns)})`);
-  console.log(`  후보 0명이 된 횟수: ${emptyCandidate}회`);
+  console.log('  ' + '연속 지목'.padEnd(8) + '  ' + cell(a.consecutive, a.totalTurns) + '    ' + cell(b.consecutive, b.totalTurns));
+  console.log('  ' + '후보 0명'.padEnd(8) + '  ' + cell(a.exhaustedCount, a.totalTurns) + '    ' + cell(b.exhaustedCount, b.totalTurns));
   console.log('');
+
+  return { a, b };
 }
 
-console.log('지목 대상 선정 규칙 시뮬레이션');
-console.log(`(인원수 × ${TURNS_PER_PLAYER} 턴, 시드 고정)`);
+console.log('지목 대상 선정 규칙 시뮬레이션 - 시나리오 A vs B');
+console.log(`(인원수 x ${TURNS_PER_PLAYER} 턴, 시드 고정, 차례는 (turnIndex+1) % n 순환)`);
+console.log('A  = 현재 규칙: 직전에 지목당한 사람 1명 제외');
+console.log('B  = 제안 규칙: 직전 지목 대상 + 예측자가 직전에 붙었던 상대, 둘 다 제외 (서로 기억)');
+console.log('B2 = 제안 변형: 위와 같되 예측자 쪽만 기억');
+console.log('후보 0명 = 제외 규칙을 다 적용하면 뽑을 사람이 없어져 임시 fallback 을 쓴 횟수');
 console.log('');
 
+const summary = [];
 for (let n = 3; n <= 8; n++) {
-  report(n, 12345 + n);
+  const { a, b } = comparePair(n, 12345 + n);
+  const b2 = simulate(n, 12345 + n, 'B2');
+  summary.push({ n, a, b, b2 });
 }
 
-// 2명일 때는 상대가 1명뿐이라 직전 대상을 빼면 후보가 사라진다.
-// 그 경우에도 후보가 0명이 되지 않는지 안전장치를 따로 확인한다.
-const two = simulate(2, 99);
-console.log('=== 안전장치 확인: 2명 ===');
-console.log(`총 턴 수: ${two.totalTurns}`);
-console.log(`  후보 0명이 된 횟수: ${two.emptyCandidate}회  ${two.emptyCandidate === 0 ? '(정상)' : '(문제!)'}`);
-console.log(`  연속 지목: ${two.consecutive}회  (차례가 번갈아 도니 대상도 번갈아 나온다)`);
+// ---------------------------------------------------------------------------
+// 4. 핵심 관심사 요약
+// ---------------------------------------------------------------------------
+
+console.log('-------------------------------------------------------------------------');
+console.log('[요약 1] "둘 다 제외하면 후보 0명" 발생 빈도');
+console.log('');
+console.log('  인원     총 턴수    A(현재)             B(제안)             B2(예측자만 기억)');
+summary.forEach(({ n, a, b, b2 }) => {
+  console.log(
+    '  ' + (n + '명').padEnd(7) +
+    String(a.totalTurns).padStart(8) + '   ' +
+    pair(a.exhaustedCount, a.totalTurns) +
+    pair(b.exhaustedCount, b.totalTurns) +
+    pair(b2.exhaustedCount, b2.totalTurns)
+  );
+});
+console.log('');
+
+console.log('[요약 2] 연속 지목(직전과 동일 대상) 횟수');
+console.log('');
+console.log('  인원              A(현재)             B(제안)             B2(예측자만 기억)');
+summary.forEach(({ n, a, b, b2 }) => {
+  console.log(
+    '  ' + (n + '명').padEnd(7) + '           ' +
+    pair(a.consecutive, a.totalTurns) +
+    pair(b.consecutive, b.totalTurns) +
+    pair(b2.consecutive, b2.totalTurns)
+  );
+});
+console.log('');
+
+console.log('[요약 3] 지목 비율의 최대 편차 (균등 기대치 대비)');
+console.log('');
+console.log('  인원        A(현재)      B(제안)      B2(예측자만 기억)');
+summary.forEach(({ n, a, b, b2 }) => {
+  console.log('  ' + (n + '명').padEnd(7) + '     ' + maxSpread(a).padEnd(13) + maxSpread(b).padEnd(13) + maxSpread(b2));
+});
+console.log('');
+
+// 3명 B 의 "후보 0명 0회" 가 이 시드에서만 나온 우연인지 확인한다.
+// others 가 n-1 명이고 제외가 최대 2명이므로 4명 이상은 구조적으로 0 이 보장되지만,
+// 3명은 others 가 2명이라 둘 다 걸리면 비워질 수 있어 시드를 바꿔 가며 확인해야 한다.
+const SEED_SWEEP_COUNT = 200;
+const SEED_SWEEP_TURNS = 2000; // 인원수 × 2000 턴 (시드를 많이 돌리므로 짧게)
+
+function seedSweep(n, scenarioKey) {
+  let seedsWithEmpty = 0;
+  let worst = 0;
+  for (let seed = 1; seed <= SEED_SWEEP_COUNT; seed++) {
+    const r = simulate(n, seed, scenarioKey, SEED_SWEEP_TURNS);
+    if (r.exhaustedCount > 0) seedsWithEmpty++;
+    const p = (r.exhaustedCount / r.totalTurns) * 100;
+    if (p > worst) worst = p;
+  }
+  return { seedsWithEmpty, worst };
+}
+
+console.log('[요약 4] 시드 민감도: "후보 0명" 이 특정 시드만의 우연인지 확인');
+console.log(`(시드 ${SEED_SWEEP_COUNT}개 x 인원수 x ${SEED_SWEEP_TURNS}턴)`);
+console.log('');
+console.log('  인원     B(제안): 발생 시드수 / 최대 발생률     B2(예측자만): 발생 시드수 / 최대 발생률');
+for (let n = 3; n <= 8; n++) {
+  const b = seedSweep(n, 'B');
+  const b2 = seedSweep(n, 'B2');
+  console.log(
+    '  ' + (n + '명').padEnd(7) + '  ' +
+    (`${b.seedsWithEmpty} / ${SEED_SWEEP_COUNT}개, 최대 ${b.worst.toFixed(2)}%`).padEnd(38) +
+    `${b2.seedsWithEmpty} / ${SEED_SWEEP_COUNT}개, 최대 ${b2.worst.toFixed(2)}%`
+  );
+}
+console.log('');
+
+// 2명은 상대가 1명뿐이라 제외 규칙이 곧바로 후보를 비운다. 참고용으로 같이 확인한다.
+console.log('-------------------------------------------------------------------------');
+console.log('[참고] 2명 (시뮬레이션 대상 범위 밖, fallback 동작 확인용)');
+const twoA = simulate(2, 99, 'A');
+const twoB = simulate(2, 99, 'B');
+console.log(`  총 ${twoA.totalTurns}턴`);
+console.log(`  A   후보 0명 ${twoA.exhaustedCount}회 ${pct(twoA.exhaustedCount, twoA.totalTurns)}   물리적 후보 0명 ${twoA.noCandidate}회`);
+console.log(`  B   후보 0명 ${twoB.exhaustedCount}회 ${pct(twoB.exhaustedCount, twoB.totalTurns)}   물리적 후보 0명 ${twoB.noCandidate}회`);
