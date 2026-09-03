@@ -7,12 +7,16 @@ export default function StealSelectionModal({ isOpen, othersLands, players, boar
     <div style={styles.overlay}>
       <div className="card-wobbly" style={styles.modal}>
         <h2 style={styles.title}>우주 해적의 습격! 🏴‍☠️</h2>
-        <p style={styles.description}>어느 구역의 깃발을 강탈하시겠습니까?</p>
+        <p style={styles.description}>
+          {othersLands.length === 0
+            ? '주변을 샅샅이 뒤져 보았지만...'
+            : '어느 구역의 깃발을 강탈하시겠습니까?'}
+        </p>
         
         {othersLands.length === 0 ? (
           <div style={styles.emptyMsg}>
             <p>앗, 뺏을 수 있는 남의 깃발이 하나도 없습니다!</p>
-            <button className="btn-wobbly" style={styles.btn} onClick={() => onSelect(null)}>아쉽지만 돌아가기</button>
+            <button className="btn-wobbly" style={styles.btn} onClick={() => onSelect(null)}>확인</button>
           </div>
         ) : (
           <div style={styles.list}>

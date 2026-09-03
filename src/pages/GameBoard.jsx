@@ -542,11 +542,12 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
           if (oid !== playerId) othersLands.push({ spaceId: parseInt(sid), ownerId: oid });
         });
       });
-      if (othersLands.length > 0) {
-        setStealState({ isOpen: true, othersLands });
-        await updateDoc(gameStateRef, baseUpdates);
-        return; 
-      }
+      // 뺏을 깃발이 없어도 모달을 연다. StealSelectionModal 이 빈 목록일 때
+      // 안내 문구와 확인 버튼을 보여 주고, 확인하면 handleStealFlag(null) 로
+      // 기존 턴 넘김 경로를 그대로 탄다. (조용히 넘어가 버리지 않게 하기 위함)
+      setStealState({ isOpen: true, othersLands });
+      await updateDoc(gameStateRef, baseUpdates);
+      return;
     } else if (card.action === 'roll_again') {
       baseUpdates['turnIndex'] = gameState.turnIndex; 
       baseUpdates['diceState.isRolling'] = false;
@@ -554,7 +555,7 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
       return;
     }
     
-    // For 'skip_turn', 'none', or 'steal_flag' with no lands to steal:
+    // For 'skip_turn' or 'none':
     const skipMap = { ...(gameState.skipTurns || {}) };
     if (card.action === 'skip_turn') {
       // 블랙홀: 이 사람의 "다음 자기 차례" 한 번을 건너뛰게 예약한다.
