@@ -12,6 +12,33 @@ import { generateBoard } from '../utils/boardData';
 import { missions } from '../data/missions';
 import { goldenKeys } from '../data/goldenKeys';
 
+// 다음 차례를 계산한다. 넘어간 자리의 주인이 "한 턴 쉬기" 상태면 그 쉬기를 1회 소모하고
+// 다시 다음 사람으로 넘긴다. 턴을 넘기는 지점이 여러 군데라 계산을 이 한 곳으로 모았다.
+// 반환한 { turnIndex, skipTurns } 를 그대로 updateDoc 에 실어 보내면 된다.
+//   currentTurnIndex : 지금 차례인 사람의 인덱스
+//   roster           : joinedAt 순으로 정렬된 플레이어 배열
+//   skipMap          : { playerId: 남은 쉬기 횟수 }. 없으면 {} 로 본다.
+function computeNextTurn(currentTurnIndex, roster, skipMap) {
+  const total = roster ? roster.length : 0;
+  if (total === 0) return { turnIndex: 0, skipTurns: { ...(skipMap || {}) } };
+
+  const remaining = { ...(skipMap || {}) };
+  let next = ((currentTurnIndex || 0) + 1) % total;
+
+  // 전원이 쉬기 상태인 극단적인 경우에도 멈추도록 최대 인원수만큼만 돈다.
+  for (let i = 0; i < total; i++) {
+    const candidate = roster[next];
+    const left = candidate ? remaining[candidate.id] || 0 : 0;
+    if (left <= 0) break;
+    // 쉬기는 1회성이다. 소모하고 남은 값이 없으면 키 자체를 지운다.
+    if (left <= 1) delete remaining[candidate.id];
+    else remaining[candidate.id] = left - 1;
+    next = (next + 1) % total;
+  }
+
+  return { turnIndex: next, skipTurns: remaining };
+}
+
 export default function GameBoard({ sessionData, onBack, onHome }) {
   const { code, roomId, playerId, nickname } = sessionData;
   const [board, setBoard] = useState([]);
@@ -85,7 +112,6 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
           name: data.nickname,
           character: { color: data.color === 'rainbow' ? 'rainbow' : `var(--color-${data.color})`, label: data.color + ' 행성' },
           position: 0,
-          skipTurn: false,
           joinedAt: data.joinedAt || Date.now()
         });
       });
@@ -104,6 +130,7 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
           globalUsedMissions: {},
           targetUsedMissions: {},
           lastOpponent: {},
+          skipTurns: {},
           playerPositions: loadedPlayers.reduce((acc, p) => ({ ...acc, [p.id]: 0 }), {})
         });
       }
@@ -139,7 +166,7 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
         const existing = prev.find((p) => p.id === r.id);
         return existing
           ? { ...existing, name: r.name, character: r.character, joinedAt: r.joinedAt }
-          : { ...r, position: 0, skipTurn: false };
+          : { ...r, position: 0 };
       }));
     });
     return () => unsubscribe();
@@ -469,7 +496,9 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
     }
     
     // If not a mission space, just advance turn
-    nextStateUpdates['turnIndex'] = ((snapData.turnIndex || 0) + 1) % currentPlayers.length;
+    const nextTurn = computeNextTurn(snapData.turnIndex, currentPlayers, snapData.skipTurns);
+    nextStateUpdates['turnIndex'] = nextTurn.turnIndex;
+    nextStateUpdates['skipTurns'] = nextTurn.skipTurns;
     nextStateUpdates['diceState.isRolling'] = false;
     await updateDoc(gameStateRef, nextStateUpdates);
   };
@@ -526,15 +555,25 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
     }
     
     // For 'skip_turn', 'none', or 'steal_flag' with no lands to steal:
-    baseUpdates['turnIndex'] = ((gameState.turnIndex || 0) + 1) % players.length;
+    const skipMap = { ...(gameState.skipTurns || {}) };
+    if (card.action === 'skip_turn') {
+      // 블랙홀: 이 사람의 "다음 자기 차례" 한 번을 건너뛰게 예약한다.
+      // 차례가 실제로 돌아왔을 때 computeNextTurn 이 이 값을 1 소모하고 지나간다.
+      skipMap[playerId] = (skipMap[playerId] || 0) + 1;
+    }
+    const nextTurn = computeNextTurn(gameState.turnIndex, players, skipMap);
+    baseUpdates['turnIndex'] = nextTurn.turnIndex;
+    baseUpdates['skipTurns'] = nextTurn.skipTurns;
     baseUpdates['diceState.isRolling'] = false;
     await updateDoc(gameStateRef, baseUpdates);
   };
 
   const handleStealFlag = async (land) => {
     if (!land) {
+      const cancelTurn = computeNextTurn(gameState.turnIndex, players, gameState.skipTurns);
       await updateDoc(gameStateRef, {
-        turnIndex: ((gameState.turnIndex || 0) + 1) % players.length,
+        turnIndex: cancelTurn.turnIndex,
+        skipTurns: cancelTurn.skipTurns,
         'diceState.isRolling': false
       });
       setStealState({ isOpen: false });
@@ -549,9 +588,11 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
     if (!newOwnership[spaceId]) newOwnership[spaceId] = {};
     newOwnership[spaceId][playerId] = (newOwnership[spaceId][playerId] || 0) + 1;
 
+    const nextTurn = computeNextTurn(gameState.turnIndex, players, gameState.skipTurns);
     await updateDoc(gameStateRef, {
       landOwnership: newOwnership,
-      turnIndex: ((gameState.turnIndex || 0) + 1) % players.length,
+      turnIndex: nextTurn.turnIndex,
+      skipTurns: nextTurn.skipTurns,
       'diceState.isRolling': false
     });
     setStealState({ isOpen: false });
@@ -563,9 +604,11 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
 
   const handleMissionFailOrClose = async () => {
     if (!gameState || gameState.missionState.activePlayerId !== playerId) return;
+    const nextTurn = computeNextTurn(gameState.turnIndex, players, gameState.skipTurns);
     await updateDoc(gameStateRef, {
       'missionState.isOpen': false,
-      turnIndex: ((gameState.turnIndex || 0) + 1) % players.length,
+      turnIndex: nextTurn.turnIndex,
+      skipTurns: nextTurn.skipTurns,
       'diceState.isRolling': false
     });
   };
