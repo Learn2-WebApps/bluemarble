@@ -103,6 +103,7 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
           landOwnership: {},
           globalUsedMissions: {},
           targetUsedMissions: {},
+          lastOpponent: {},
           playerPositions: loadedPlayers.reduce((acc, p) => ({ ...acc, [p.id]: 0 }), {})
         });
       }
@@ -372,14 +373,26 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
         });
 
         if (otherPlayers.length > 0) {
-          // 직전에 지목당한 사람은 연속으로 걸리지 않게 뺀다.
+          // 후보에서 두 사람을 뺀다.
+          //  - 직전 턴에 지목당한 사람: 같은 사람이 연달아 걸리지 않게
+          //  - 예측자가 직전에 붙었던 상대: 같은 두 사람이 반복해서 붙지 않게
           // 인원수로 막지 않고, 뺐을 때 후보가 최소 1명 남는 경우에만 적용한다.
-          // (2인 플레이에서 하나뿐인 상대가 직전 대상이면 filtered 가 비므로 그대로 둔다.)
+          // 둘 다 빼서 비면 "직전 지목 대상만 제외" 로 한 단계 완화하고,
+          // 그래도 비면 제외 없이 원래 후보를 쓴다. 후보가 0명이 되는 일은 없다.
+          // (2인 방처럼 상대가 원래 1명뿐이면 그 1명이 그대로 남는다.)
           const lastTargetId = snapData.missionState?.targetPlayerId;
+          const lastOpponentMap = snapData.lastOpponent || {};
+          const lastOpponentId = lastOpponentMap[activePlayer.id] || null;
+
           let candidates = otherPlayers;
-          if (lastTargetId) {
-            const filtered = otherPlayers.filter(p => p.id !== lastTargetId);
-            if (filtered.length > 0) candidates = filtered;
+          if (lastTargetId || lastOpponentId) {
+            const strict = otherPlayers.filter(p => p.id !== lastTargetId && p.id !== lastOpponentId);
+            if (strict.length > 0) {
+              candidates = strict;
+            } else {
+              const relaxed = otherPlayers.filter(p => p.id !== lastTargetId);
+              if (relaxed.length > 0) candidates = relaxed;
+            }
           }
 
           const chosenTarget = candidates[Math.floor(Math.random() * candidates.length)];
@@ -418,6 +431,13 @@ export default function GameBoard({ sessionData, onBack, onHome }) {
           nextStateUpdates['globalUsedMissions'] = {
             ...globalUsedObj,
             [category]: [...globalUsed, chosenMissionIndex]
+          };
+
+          // 붙은 두 사람이 서로를 기억한다. 지목이 확정되는 이 지점에서만 갱신한다.
+          nextStateUpdates['lastOpponent'] = {
+            ...lastOpponentMap,
+            [activePlayer.id]: chosenTarget.id,
+            [chosenTarget.id]: activePlayer.id
           };
 
           nextStateUpdates['missionState'] = {

@@ -5,15 +5,15 @@
  * 실행: node scripts/simulateTarget.js
  *
  * 시나리오
- *   A  (현재 규칙)  src/pages/GameBoard.jsx 의 handleSpaceArrival 후보 선정 구간 복제.
- *                   예측자 자신 제외 + 직전에 지목당한 사람 1명 제외.
- *   B  (제안 규칙)  A 에 더해 "예측자가 직전에 붙었던 상대" 1명도 제외.
- *                   붙은 두 사람이 서로를 기억한다 (lastOpponent 양쪽 갱신).
- *   B2 (제안 변형)  B 와 같되 예측자 쪽만 기억한다 (lastOpponent 예측자만 갱신).
+ *   B  (현재 규칙)  src/pages/GameBoard.jsx 의 handleSpaceArrival 후보 선정 구간 복제.
+ *                   예측자 자신 + 직전에 지목당한 사람 1명 + 예측자가 직전에 붙었던
+ *                   상대 1명을 제외한다. 붙은 두 사람은 서로를 기억한다
+ *                   (Firestore gameState.lastOpponent 를 양쪽 갱신).
+ *   A  (이전 규칙)  직전에 지목당한 사람 1명만 제외. 비교 기준으로 남겨 둔다.
+ *   B2 (변형)       B 와 같되 예측자 쪽만 기억한다. 3명에서 무너지는 것을 보여 준다.
  *
- * B / B2 에서 둘 다 빼면 후보가 0명이 되는 경우가 이번 시뮬레이션의 핵심 관심사다.
- * 그 상황은 횟수만 세어 두고, 진행은 임시로 "직전 지목 대상만 제외" 로 되돌린다.
- * (fallback 우선순위는 아직 정하지 않았으므로 어디까지나 임시 처리다.)
+ * 제외를 다 적용하면 후보가 0명이 되는 경우가 핵심 관심사다. 게임 코드와 동일하게
+ * "직전 지목 대상만 제외" 로 한 단계 완화하고, 그래도 비면 원래 후보를 쓴다.
  */
 
 // ---------------------------------------------------------------------------
@@ -52,7 +52,8 @@ function pickTarget(players, activePlayerId, lastTargetId, lastOpponentId, rando
     if (filtered.length > 0) {
       candidates = filtered;
     } else {
-      // 관심 지점: 제외 규칙을 다 적용하면 뽑을 사람이 없어지는 상황.
+      // 관심 지점: 제외를 다 적용하면 뽑을 사람이 없어지는 상황.
+      // 게임 코드와 동일하게 "직전 지목 대상만 제외" 로 한 단계 완화한다.
       exhausted = true;
       const fallback = otherPlayers.filter((p) => p.id !== lastTargetId);
       candidates = fallback.length > 0 ? fallback : otherPlayers;
@@ -167,7 +168,7 @@ function comparePair(playerCount, seed) {
   const expected = 100 / playerCount;
 
   console.log(`=== ${playerCount}명  (총 ${a.totalTurns}턴, 균등 기대치 ${expected.toFixed(2)}%) ===`);
-  console.log('              A: 직전 대상만        B: 직전 대상 + 직전 상대');
+  console.log('           A: 이전(직전 대상만)   B: 현재(대상+직전 상대)');
   console.log('  플레이어      횟수     비율          횟수     비율');
   a.players.forEach((p) => {
     console.log('  ' + p.id.padEnd(10) + cell(a.counts[p.id], a.totalTurns) + '    ' + cell(b.counts[p.id], b.totalTurns));
@@ -179,11 +180,11 @@ function comparePair(playerCount, seed) {
   return { a, b };
 }
 
-console.log('지목 대상 선정 규칙 시뮬레이션 - 시나리오 A vs B');
+console.log('지목 대상 선정 규칙 시뮬레이션 - 현재 규칙(B) vs 이전 규칙(A)');
 console.log(`(인원수 x ${TURNS_PER_PLAYER} 턴, 시드 고정, 차례는 (turnIndex+1) % n 순환)`);
-console.log('A  = 현재 규칙: 직전에 지목당한 사람 1명 제외');
-console.log('B  = 제안 규칙: 직전 지목 대상 + 예측자가 직전에 붙었던 상대, 둘 다 제외 (서로 기억)');
-console.log('B2 = 제안 변형: 위와 같되 예측자 쪽만 기억');
+console.log('B  = 현재 규칙 (게임 코드와 동일): 직전 지목 대상 + 예측자의 직전 상대, 둘 다 제외 (서로 기억)');
+console.log('A  = 이전 규칙 (비교 기준): 직전에 지목당한 사람 1명만 제외');
+console.log('B2 = 변형: 위와 같되 예측자 쪽만 기억');
 console.log('후보 0명 = 제외 규칙을 다 적용하면 뽑을 사람이 없어져 임시 fallback 을 쓴 횟수');
 console.log('');
 
@@ -201,7 +202,7 @@ for (let n = 3; n <= 8; n++) {
 console.log('-------------------------------------------------------------------------');
 console.log('[요약 1] "둘 다 제외하면 후보 0명" 발생 빈도');
 console.log('');
-console.log('  인원     총 턴수    A(현재)             B(제안)             B2(예측자만 기억)');
+console.log('  인원     총 턴수    A(이전)             B(현재)             B2(예측자만 기억)');
 summary.forEach(({ n, a, b, b2 }) => {
   console.log(
     '  ' + (n + '명').padEnd(7) +
@@ -215,7 +216,7 @@ console.log('');
 
 console.log('[요약 2] 연속 지목(직전과 동일 대상) 횟수');
 console.log('');
-console.log('  인원              A(현재)             B(제안)             B2(예측자만 기억)');
+console.log('  인원              A(이전)             B(현재)             B2(예측자만 기억)');
 summary.forEach(({ n, a, b, b2 }) => {
   console.log(
     '  ' + (n + '명').padEnd(7) + '           ' +
@@ -228,7 +229,7 @@ console.log('');
 
 console.log('[요약 3] 지목 비율의 최대 편차 (균등 기대치 대비)');
 console.log('');
-console.log('  인원        A(현재)      B(제안)      B2(예측자만 기억)');
+console.log('  인원        A(이전)      B(현재)      B2(예측자만 기억)');
 summary.forEach(({ n, a, b, b2 }) => {
   console.log('  ' + (n + '명').padEnd(7) + '     ' + maxSpread(a).padEnd(13) + maxSpread(b).padEnd(13) + maxSpread(b2));
 });
@@ -255,7 +256,7 @@ function seedSweep(n, scenarioKey) {
 console.log('[요약 4] 시드 민감도: "후보 0명" 이 특정 시드만의 우연인지 확인');
 console.log(`(시드 ${SEED_SWEEP_COUNT}개 x 인원수 x ${SEED_SWEEP_TURNS}턴)`);
 console.log('');
-console.log('  인원     B(제안): 발생 시드수 / 최대 발생률     B2(예측자만): 발생 시드수 / 최대 발생률');
+console.log('  인원     B(현재): 발생 시드수 / 최대 발생률     B2(예측자만): 발생 시드수 / 최대 발생률');
 for (let n = 3; n <= 8; n++) {
   const b = seedSweep(n, 'B');
   const b2 = seedSweep(n, 'B2');
