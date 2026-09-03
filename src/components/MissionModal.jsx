@@ -58,23 +58,23 @@ export default function MissionModal({ isOpen, missionState, players, myPlayerId
   };
 
   return (
-    <div style={styles.overlay}>
-      <div className="card-wobbly" style={styles.modal}>
-        <div style={{ ...styles.categoryBadge, backgroundColor: data.color }}>
+    <div className="mission-overlay" style={styles.overlay}>
+      <div className="card-wobbly mission-modal" style={styles.modal}>
+        <div className="mission-category" style={{ ...styles.categoryBadge, backgroundColor: data.color }}>
           {data.category}
         </div>
         
-        <p style={styles.question}>{displayQuestion()}</p>
+        <p className="mission-question" style={styles.question}>{displayQuestion()}</p>
 
         {!bothAnswered ? (
           <div style={styles.phaseContainer}>
             {isThirdParty && (
               <>
-                <h3 style={styles.instruction}>
+                <h3 className="mission-instruction" style={styles.instruction}>
                   {activePlayer.name}님이 {targetPlayer.name}님의 행동을 예측 중입니다...<br/>
                   결과를 기다려주세요! ⏳
                 </h3>
-                <div style={styles.optionsList}>
+                <div className="mission-options" style={styles.optionsList}>
                   {data.options.map((opt, i) => (
                     <button 
                       key={i} 
@@ -96,11 +96,11 @@ export default function MissionModal({ isOpen, missionState, players, myPlayerId
             )}
             {isPredictor && (
               <>
-                <h3 style={styles.instruction}>
+                <h3 className="mission-instruction" style={styles.instruction}>
                   {targetPlayer.name}님의 선택을 예측해보세요!
                 </h3>
                 {prediction === null ? (
-                  <div style={styles.optionsList}>
+                  <div className="mission-options" style={styles.optionsList}>
                     {data.options.map((opt, i) => (
                       <button 
                         key={i} 
@@ -116,7 +116,7 @@ export default function MissionModal({ isOpen, missionState, players, myPlayerId
                       </button>
                     ))}
                     <button 
-                      className="btn-wobbly" 
+                      className="btn-wobbly mission-confirm" 
                       style={{...styles.confirmBtn, opacity: localPrediction === null ? 0.5 : 1}}
                       disabled={localPrediction === null}
                       onClick={handlePredict}
@@ -125,17 +125,17 @@ export default function MissionModal({ isOpen, missionState, players, myPlayerId
                     </button>
                   </div>
                 ) : (
-                  <h3 style={styles.instruction}>상대방의 선택을 기다리는 중입니다... ⏳</h3>
+                  <h3 className="mission-instruction" style={styles.instruction}>상대방의 선택을 기다리는 중입니다... ⏳</h3>
                 )}
               </>
             )}
             {isTarget && (
               <>
-                <h3 style={styles.instruction}>
+                <h3 className="mission-instruction" style={styles.instruction}>
                   실제로 어떻게 행동하실 건가요?
                 </h3>
                 {actualAnswer === null ? (
-                  <div style={styles.optionsList}>
+                  <div className="mission-options" style={styles.optionsList}>
                     {data.options.map((opt, i) => (
                       <button 
                         key={i} 
@@ -151,7 +151,7 @@ export default function MissionModal({ isOpen, missionState, players, myPlayerId
                       </button>
                     ))}
                     <button 
-                      className="btn-wobbly" 
+                      className="btn-wobbly mission-confirm" 
                       style={{...styles.confirmBtn, opacity: localActualAnswer === null ? 0.5 : 1}}
                       disabled={localActualAnswer === null}
                       onClick={handleActualAnswer}
@@ -160,7 +160,7 @@ export default function MissionModal({ isOpen, missionState, players, myPlayerId
                     </button>
                   </div>
                 ) : (
-                  <h3 style={styles.instruction}>{activePlayer.name}님의 예측을 기다리는 중입니다... ⏳</h3>
+                  <h3 className="mission-instruction" style={styles.instruction}>{activePlayer.name}님의 예측을 기다리는 중입니다... ⏳</h3>
                 )}
               </>
             )}
@@ -170,7 +170,7 @@ export default function MissionModal({ isOpen, missionState, players, myPlayerId
             <h3 style={{ ...styles.resultHeadline, color: prediction === actualAnswer ? SUCCESS_COLOR : FAIL_COLOR }}>
               {prediction === actualAnswer ? '예측 성공! 🎉' : '예측 실패! 💦'}
             </h3>
-            <div style={styles.optionsList}>
+            <div className="mission-options" style={styles.optionsList}>
               {data.options.map((opt, i) => {
                 const isTargetChoice = i === actualAnswer;
                 const isPredictChoice = i === prediction;
@@ -230,12 +230,13 @@ export default function MissionModal({ isOpen, missionState, players, myPlayerId
 
 const styles = {
   overlay: {
-    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    // 높이를 dvh 로 잡아야 모바일 주소창이 보일 때도 화면 밖으로 내려가지 않는다.
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, height: '100dvh',
     backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000,
     display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px',
   },
   modal: {
-    width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto',
+    width: '100%', maxWidth: '600px', maxHeight: '90dvh', overflowY: 'auto',
     display: 'flex', flexDirection: 'column', alignItems: 'center',
     backgroundColor: 'var(--color-yellow)', padding: '30px 20px',
   },

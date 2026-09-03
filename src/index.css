@@ -261,3 +261,42 @@ h1, h2, h3, h4, h5, h6 {
     padding: 10px 20px !important;
   }
 }
+
+/* ── 문제(예측) 화면 레이아웃 ───────────────────────────────────────────
+   폰에서 질문 ~ 선택지 ~ "확인" 이 세로로 살짝 넘쳐 버튼 아래가 잘렸다.
+   여백·간격·글자를 조금씩만 줄여 한 화면에 들어오게 한다.
+   판정·선택 로직에는 관여하지 않는 순수 레이아웃 규칙이며,
+   결과 화면의 성공/실패 제목(2.2rem)과 대기 문구 글씨체는 건드리지 않는다. */
+@media (max-width: 480px) {
+  .mission-overlay {
+    padding: 10px !important;
+  }
+  .mission-modal {
+    padding: 16px 14px !important;
+  }
+  .mission-category {
+    font-size: 1rem !important;
+    margin-bottom: 8px !important;
+  }
+  .mission-question {
+    font-size: 1.3rem !important;
+    margin-bottom: 14px !important;
+  }
+  .mission-instruction {
+    font-size: 1.1rem !important;
+    margin-bottom: 10px !important;
+  }
+  .mission-options {
+    gap: 8px !important;
+  }
+  /* 선택지 버튼만. 같은 목록 안에 있는 "확인" 버튼은 아래에서 따로 잡는다. */
+  .mission-options > button:not(.mission-confirm) {
+    padding: 10px !important;
+    font-size: 1.05rem !important;
+  }
+  .mission-confirm {
+    margin-top: 10px !important;
+    padding: 10px 24px !important;
+    font-size: 1.1rem !important;
+  }
+}
