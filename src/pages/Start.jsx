@@ -114,7 +114,7 @@ export default function Start({ onEnter, onResume, onAdmin }) {
 
       <div className="card-wobbly" style={styles.card}>
         <h1 style={styles.title}>
-          <span style={{ color: 'var(--color-yellow)', textShadow: '3px 3px 0 #111' }}>우주 탐험</span> 보드게임
+          <span style={{ color: 'var(--color-yellow)', textShadow: '3px 3px 0 #111' }}>시그널</span> 보드게임
         </h1>
         <p style={styles.subtitle}>🚀 미지의 행성을 정복할 탐험대원을 모집합니다!</p>
 
